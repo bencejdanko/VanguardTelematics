@@ -17,19 +17,18 @@ export interface SensorData {
   roll: number;
 }
 
-export const useSensorStream = (isActive: boolean) => {
-  const [dataStream, setDataStream] = useState<SensorData[]>([]);
-  const [currentData, setCurrentData] = useState<SensorData | null>(null);
-  const [isEmergency, setIsEmergency] = useState(false);
+export const useSensorStream = (activeVehicleId: string | null) => {
+  const [streams, setStreams] = useState<Record<string, SensorData[]>>({});
+  const [currentData, setCurrentData] = useState<Record<string, SensorData | null>>({});
+  const [emergencies, setEmergencies] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!isActive) return;
-
     const source = new EventSource('http://localhost:8000/stream');
 
     source.onmessage = (e) => {
       try {
         const raw = JSON.parse(e.data);
+        const vehicle_id = raw.vehicle_id || 'V-001';
         
         const nextPoint: SensorData = {
           time: raw.time || new Date().toLocaleTimeString(),
@@ -43,22 +42,23 @@ export const useSensorStream = (isActive: boolean) => {
           magY: raw.mag_y_mgauss || 0,
           magZ: raw.mag_z_mgauss || 0,
           pressure: raw.press_hpa || 0,
-          temperature: Number(raw.temp || raw.temperature) || 0,
+          temperature: Number(raw.temp || raw.temperature || raw.roll_deg) || 0,
           pitch: raw.pitch_deg || 0,
           roll: raw.roll_deg || 0,
         };
 
-        // Emergency logic: Z-axis gyro exceeds threshold (e.g. > 8000 mdps) or Z accel drops (< 500 mg, indicating freefall/tilt)
+        // Emergency threshold check
         if (Math.abs(nextPoint.gyroZ) > 8000 || Math.abs(nextPoint.accelZ) < 500) {
-          setIsEmergency(true);
+          setEmergencies(prev => ({ ...prev, [vehicle_id]: true }));
         }
 
-        setCurrentData(nextPoint);
-        setDataStream((prev) => {
-          const newStream = [...prev, nextPoint];
-          // Keep last 50 points for chart
-          if (newStream.length > 50) return newStream.slice(newStream.length - 50);
-          return newStream;
+        setCurrentData(prev => ({ ...prev, [vehicle_id]: nextPoint }));
+        
+        setStreams((prev) => {
+          const stream = prev[vehicle_id] || [];
+          const newStream = [...stream, nextPoint];
+          if (newStream.length > 50) return { ...prev, [vehicle_id]: newStream.slice(newStream.length - 50) };
+          return { ...prev, [vehicle_id]: newStream };
         });
       } catch (err) {
         console.error("Error parsing SSE data:", err);
@@ -72,11 +72,20 @@ export const useSensorStream = (isActive: boolean) => {
     return () => {
       source.close();
     };
-  }, [isActive]);
+  }, []);
 
-  const resetEmergency = () => {
-    setIsEmergency(false);
+  const resetEmergency = (vId: string) => {
+    setEmergencies(prev => ({ ...prev, [vId]: false }));
   };
 
-  return { dataStream, currentData, isEmergency, resetEmergency };
+  if (!activeVehicleId) {
+    return { dataStream: [], currentData: null, isEmergency: false, resetEmergency: () => {} };
+  }
+
+  return { 
+    dataStream: streams[activeVehicleId] || [], 
+    currentData: currentData[activeVehicleId] || null, 
+    isEmergency: emergencies[activeVehicleId] || false, 
+    resetEmergency: () => resetEmergency(activeVehicleId) 
+  };
 };

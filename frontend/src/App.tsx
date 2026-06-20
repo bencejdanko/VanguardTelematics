@@ -1,48 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './App.module.css';
 import { VehicleList } from './components/VehicleList';
 import { TelemetryDashboard } from './components/TelemetryDashboard';
 import { EmergencyAlert } from './components/EmergencyAlert';
 import { useSensorStream } from './hooks/useSensorStream';
 
-const INITIAL_VEHICLES = [
-  { id: 'V-001', name: 'Cybertruck Unit Alpha', status: 'healthy' as const },
-  { id: 'V-002', name: 'Ambulance 12', status: 'healthy' as const },
-  { id: 'V-003', name: 'Fire Engine 4', status: 'healthy' as const },
-];
+export interface Vehicle {
+  id: string;
+  name: string;
+  status: 'healthy' | 'warning' | 'emergency';
+}
 
 function App() {
-  const [activeVehicleId, setActiveVehicleId] = useState('V-001');
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
   
-  // Custom hook simulating streaming data for the active vehicle
-  const { dataStream, currentData, isEmergency, resetEmergency } = useSensorStream(true);
+  // Custom hook tracking streaming data for all vehicles in the background
+  const { dataStream, currentData, isEmergency, resetEmergency } = useSensorStream(activeVehicleId);
 
-  // Update vehicle status in the list based on the emergency state
-  const vehicles = INITIAL_VEHICLES.map(v => {
+  // Fetch deployed vehicles on mount
+  useEffect(() => {
+    fetch('http://localhost:8000/vehicles')
+      .then(r => r.json())
+      .then(data => {
+        setVehicles(data);
+        if (data.length > 0 && !activeVehicleId) {
+          setActiveVehicleId(data[0].id);
+        }
+      })
+      .catch(err => console.error("Failed to fetch vehicles", err));
+  }, []);
+
+  // Sync the vehicle list status with any live emergencies from the stream
+  const displayVehicles = vehicles.map(v => {
     if (v.id === activeVehicleId && isEmergency) {
       return { ...v, status: 'emergency' as const };
     }
     return v;
   });
 
-  const activeVehicle = vehicles.find(v => v.id === activeVehicleId)!;
+  const activeVehicle = displayVehicles.find(v => v.id === activeVehicleId);
 
   return (
     <div className={styles.appLayout}>
       <VehicleList 
-        vehicles={vehicles} 
+        vehicles={displayVehicles} 
         activeId={activeVehicleId} 
         onSelect={setActiveVehicleId} 
       />
       
-      <TelemetryDashboard 
-        vehicleName={activeVehicle.name}
-        isEmergency={isEmergency}
-        currentData={currentData}
-        dataStream={dataStream}
-      />
+      {activeVehicle ? (
+        <TelemetryDashboard 
+          vehicleName={activeVehicle.name}
+          isEmergency={isEmergency}
+          currentData={currentData}
+          dataStream={dataStream}
+        />
+      ) : (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+          Loading Fleet Data...
+        </div>
+      )}
 
-      {isEmergency && (
+      {isEmergency && activeVehicle && (
         <EmergencyAlert 
           vehicleName={activeVehicle.name} 
           onDismiss={resetEmergency} 

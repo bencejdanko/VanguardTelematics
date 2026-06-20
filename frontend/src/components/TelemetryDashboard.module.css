@@ -1,60 +1,76 @@
 .dashboard {
   flex: 1;
-  padding: 32px;
+  padding: 48px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 40px;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
 }
 
 .title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 2.5rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin: 0 0 4px 0;
+  background: linear-gradient(to right, #fff, #a1a1aa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+  font-weight: 500;
 }
 
 .statusBadge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 10px;
+  padding: 10px 20px;
   border-radius: 99px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .statusHealthy {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.05);
   color: var(--status-healthy);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  box-shadow: inset 0 1px 0 rgba(16, 185, 129, 0.1);
 }
 
 .statusEmergency {
   background: rgba(239, 68, 68, 0.1);
   color: var(--status-emergency);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   animation: pulse-emergency 1.5s infinite;
 }
 
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
 }
 
 .kpiCard {
-  padding: 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .kpiLabel {
@@ -63,13 +79,23 @@
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  letter-spacing: 0.02em;
 }
 
 .kpiValue {
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 2.25rem;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kpiUnit {
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .chartsGrid {
@@ -82,11 +108,29 @@
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .chartHeader {
-  font-size: 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.chartTitle {
+  font-size: 1.1rem;
   font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.chartSub {
+  font-size: 0.85rem;
   color: var(--text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
 }
