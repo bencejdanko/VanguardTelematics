@@ -63,7 +63,7 @@ Pushes all 1013 rows from `sample-data/sample.csv` into Redis for testing.
 
 | Key | Type | Description |
 |---|---|---|
-| `sensor:stream` | Stream | Full time-series (`XADD`) |
+| `/data/mems` | Stream | Full time-series (`XADD`) |
 | `sensor:latest` | Hash | Latest reading only (`HSET`) |
 
 ## Fields

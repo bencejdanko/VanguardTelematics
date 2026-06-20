@@ -1,26 +1,23 @@
 import { useState, useEffect } from 'react';
 import { SensorData } from '../types';
-import { API_BASE_URL, HISTORY_POLL_INTERVAL_MS, HISTORY_COUNT, SENSOR_THRESHOLDS } from '../config';
+import { API_BASE_URL, SENSOR_THRESHOLDS } from '../config';
 
-const parseSensorData = (raw: any, activeVehicleId: string): SensorData | null => {
-  const vehicle_id = raw.vehicle_id || 'V-001';
-  if (vehicle_id !== activeVehicleId) return null;
-
+const parseSensorData = (raw: any): SensorData => {
   return {
-    time: raw.time || new Date(Number(raw.stream_id?.split('-')[0] || Date.now())).toLocaleTimeString(),
-    accelX: raw.acc_x_mg || 0,
-    accelY: raw.acc_y_mg || 0,
-    accelZ: raw.acc_z_mg || 0,
-    gyroX: raw.gyr_x_mdps || 0,
-    gyroY: raw.gyr_y_mdps || 0,
-    gyroZ: raw.gyr_z_mdps || 0,
-    magX: raw.mag_x_mgauss || 0,
-    magY: raw.mag_y_mgauss || 0,
-    magZ: raw.mag_z_mgauss || 0,
-    pressure: raw.press_hpa || 0,
-    temperature: Number(raw.temp || raw.temperature || raw.roll_deg) || 0,
-    pitch: raw.pitch_deg || 0,
-    roll: raw.roll_deg || 0,
+    time: raw.time || raw.ts || raw.timestamp || new Date().toLocaleTimeString(),
+    accelX: Number(raw.acc_x_mg !== undefined ? raw.acc_x_mg : raw.acc_x) || 0,
+    accelY: Number(raw.acc_y_mg !== undefined ? raw.acc_y_mg : raw.acc_y) || 0,
+    accelZ: Number(raw.acc_z_mg !== undefined ? raw.acc_z_mg : raw.acc_z) || 0,
+    gyroX: Number(raw.gyr_x_mdps !== undefined ? raw.gyr_x_mdps : raw.gyr_x) || 0,
+    gyroY: Number(raw.gyr_y_mdps !== undefined ? raw.gyr_y_mdps : raw.gyr_y) || 0,
+    gyroZ: Number(raw.gyr_z_mdps !== undefined ? raw.gyr_z_mdps : raw.gyr_z) || 0,
+    magX: Number(raw.mag_x_mgauss !== undefined ? raw.mag_x_mgauss : raw.mag_x) || 0,
+    magY: Number(raw.mag_y_mgauss !== undefined ? raw.mag_y_mgauss : raw.mag_y) || 0,
+    magZ: Number(raw.mag_z_mgauss !== undefined ? raw.mag_z_mgauss : raw.mag_z) || 0,
+    pressure: Number(raw.press_hpa !== undefined ? raw.press_hpa : raw.press) || 0,
+    temperature: Number(raw.temp !== undefined ? raw.temp : (raw.temperature !== undefined ? raw.temperature : (raw.roll_deg !== undefined ? raw.roll_deg : raw.roll))) || 0,
+    pitch: Number(raw.pitch_deg !== undefined ? raw.pitch_deg : raw.pitch) || 0,
+    roll: Number(raw.roll_deg !== undefined ? raw.roll_deg : raw.roll) || 0,
   };
 };
 
@@ -30,54 +27,112 @@ const checkEmergency = (data: SensorData): boolean => {
 };
 
 export const useSensorStream = (activeVehicleId: string | null) => {
-  const [dataStream, setDataStream] = useState<SensorData[]>([]);
-  const [currentData, setCurrentData] = useState<SensorData | null>(null);
-  const [isEmergency, setIsEmergency] = useState<boolean>(false);
+  const [streams, setStreams] = useState<Record<string, SensorData[]>>({});
+  const [currentDataMap, setCurrentDataMap] = useState<Record<string, SensorData | null>>({});
+  const [emergencies, setEmergencies] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!activeVehicleId) return;
+    let source: EventSource | null = null;
+    let isMounted = true;
 
-    const fetchData = async () => {
+    const initStream = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/history?count=${HISTORY_COUNT}`);
-        if (!response.ok) return;
+        // 1. Fetch history first (up to 100 entries)
+        const res = await fetch(`${API_BASE_URL}/history?count=100`);
+        const historyData = await res.json();
         
-        const data = await response.json();
-        
-        // Data comes newest first, so we reverse it for chronological plotting
-        const chronological = data.reverse();
-        
-        // Filter and map for the active vehicle
-        const mappedData: SensorData[] = chronological
-          .map((raw: any) => parseSensorData(raw, activeVehicleId))
-          .filter((item: SensorData | null): item is SensorData => item !== null);
+        if (!isMounted) return;
 
-        if (mappedData.length > 0) {
-          setDataStream(mappedData);
-          
-          const latest = mappedData[mappedData.length - 1];
-          setCurrentData(latest);
-          
-          // Emergency threshold check on the latest point
-          if (checkEmergency(latest)) {
-            setIsEmergency(true);
+        const initialStreams: Record<string, SensorData[]> = {};
+        const initialCurrentData: Record<string, SensorData | null> = {};
+        const initialEmergencies: Record<string, boolean> = {};
+
+        // History comes newest-first, so reverse it to show oldest-first (chronological order)
+        const reversedHistory = [...historyData].reverse();
+
+        for (const raw of reversedHistory) {
+          const vehicle_id = raw.vehicle_id || 'V-001';
+          const point = parseSensorData(raw);
+
+          if (!initialStreams[vehicle_id]) {
+            initialStreams[vehicle_id] = [];
+          }
+          initialStreams[vehicle_id].push(point);
+          initialCurrentData[vehicle_id] = point;
+
+          // Check emergency thresholds for history entries
+          if (checkEmergency(point)) {
+            initialEmergencies[vehicle_id] = true;
           }
         }
+
+        // Limit each vehicle's stream array size to 100
+        for (const vehicle_id in initialStreams) {
+          if (initialStreams[vehicle_id].length > 100) {
+            initialStreams[vehicle_id] = initialStreams[vehicle_id].slice(initialStreams[vehicle_id].length - 100);
+          }
+        }
+
+        setStreams(initialStreams);
+        setCurrentDataMap(initialCurrentData);
+        setEmergencies(initialEmergencies);
       } catch (err) {
-        console.error("Error fetching history:", err);
+        console.error("Failed to load telemetry history:", err);
       }
+
+      if (!isMounted) return;
+
+      // 2. Start SSE Stream for real-time updates
+      source = new EventSource(`${API_BASE_URL}/stream`);
+
+      source.onmessage = (e) => {
+        try {
+          const raw = JSON.parse(e.data);
+          const vehicle_id = raw.vehicle_id || 'V-001';
+          const nextPoint = parseSensorData(raw);
+
+          // Emergency threshold check
+          if (checkEmergency(nextPoint)) {
+            setEmergencies(prev => ({ ...prev, [vehicle_id]: true }));
+          }
+
+          setCurrentDataMap(prev => ({ ...prev, [vehicle_id]: nextPoint }));
+          
+          setStreams((prev) => {
+            const stream = prev[vehicle_id] || [];
+            const newStream = [...stream, nextPoint];
+            if (newStream.length > 100) return { ...prev, [vehicle_id]: newStream.slice(newStream.length - 100) };
+            return { ...prev, [vehicle_id]: newStream };
+          });
+        } catch (err) {
+          console.error("Error parsing SSE data:", err);
+        }
+      };
+
+      source.onerror = (err) => {
+        console.error("SSE connection error:", err);
+      };
     };
 
-    // Initial fetch
-    fetchData();
+    initStream();
 
-    // Poll at configured interval
-    const interval = setInterval(fetchData, HISTORY_POLL_INTERVAL_MS);
+    return () => {
+      isMounted = false;
+      if (source) {
+        source.close();
+      }
+    };
+  }, []);
 
-    return () => clearInterval(interval);
-  }, [activeVehicleId]);
+  const resetEmergency = () => {
+    if (activeVehicleId) {
+      setEmergencies(prev => ({ ...prev, [activeVehicleId]: false }));
+    }
+  };
 
-  const resetEmergency = () => setIsEmergency(false);
+  const dataStream = activeVehicleId ? (streams[activeVehicleId] || []) : [];
+  const currentData = activeVehicleId ? (currentDataMap[activeVehicleId] || null) : null;
+  const isEmergency = activeVehicleId ? (emergencies[activeVehicleId] || false) : false;
 
   return { 
     dataStream, 

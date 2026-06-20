@@ -19,12 +19,11 @@ import os
 from typing import AsyncGenerator
 
 import redis.asyncio as aioredis
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-load_dotenv()
+from config import REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD, STREAM_KEY
 
 logger = logging.getLogger("datalogfusion.api")
 logging.basicConfig(
@@ -35,12 +34,6 @@ logging.basicConfig(
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-REDIS_HOST     = os.getenv("REDIS_HOST", "coat-generous-snow-13477.db.redis.io")
-REDIS_PORT     = int(os.getenv("REDIS_PORT", "13011"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "AU0X7vgAPgJ6lLt6f4yeZQgwlVIyc0XN")
-STREAM_KEY     = os.getenv("REDIS_STREAM_KEY", "sensor:stream")
-LATEST_KEY     = os.getenv("REDIS_LATEST_KEY", "sensor:latest")
 
 from contextlib import asynccontextmanager
 
@@ -84,7 +77,6 @@ async def post_telemetry(vehicle_id: str, data: dict):
     try:
         payload = {"vehicle_id": vehicle_id, **data}
         await r.xadd(STREAM_KEY, payload, maxlen=50000, approximate=True)
-        await r.hset(LATEST_KEY, mapping=payload)
         await r.sadd("active_vehicles", vehicle_id)
         return {"status": "ok", "ingested": True}
     except Exception as exc:
@@ -117,22 +109,6 @@ async def health():
         return {"status": "ok", "redis": "connected"}
     except Exception as exc:
         return {"status": "error", "redis": str(exc)}
-    finally:
-        await r.aclose()
-
-
-@app.get("/latest")
-async def get_latest():
-    """
-    Returns the latest sensor reading as a flat JSON object.
-    Sourced from the sensor:latest Hash (updated on every frame by the producer).
-    """
-    r = _make_redis()
-    try:
-        data = await r.hgetall(LATEST_KEY)
-        if not data:
-            return {"error": "No data yet — is the producer running?"}
-        return _cast_fields(data)
     finally:
         await r.aclose()
 

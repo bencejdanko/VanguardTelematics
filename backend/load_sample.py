@@ -17,17 +17,7 @@ import sys
 import time
 
 import redis
-from dotenv import load_dotenv
-
-load_dotenv()
-
-REDIS_HOST     = os.getenv("REDIS_HOST", "coat-generous-snow-13477.db.redis.io")
-REDIS_PORT     = int(os.getenv("REDIS_PORT", "13011"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "AU0X7vgAPgJ6lLt6f4yeZQgwlVIyc0XN")
-STREAM_KEY     = os.getenv("REDIS_STREAM_KEY", "sensor:stream")
-LATEST_KEY     = os.getenv("REDIS_LATEST_KEY", "sensor:latest")
-STREAM_MAXLEN  = int(os.getenv("REDIS_STREAM_MAXLEN", "50000"))
+from config import REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD, STREAM_KEY, STREAM_MAXLEN
 
 FIELDS = [
     "timestamp",
@@ -72,7 +62,6 @@ def load(live: bool = False):
 
     for row in rows:
         pipe.xadd(STREAM_KEY, row, maxlen=STREAM_MAXLEN, approximate=True)
-        pipe.hset(LATEST_KEY, mapping=row)
         count += 1
 
         if count % 50 == 0:
@@ -85,7 +74,6 @@ def load(live: bool = False):
     pipe.execute()
     print(f"Done — {count} records written to Redis")
     print(f"  Stream key : {STREAM_KEY}  ({r.xlen(STREAM_KEY)} total entries)")
-    print(f"  Latest key : {LATEST_KEY}")
 
 
 if __name__ == "__main__":
