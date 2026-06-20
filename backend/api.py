@@ -52,6 +52,8 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(analytics_worker())
     yield
     task.cancel()
+    if redis_client is not None:
+        await redis_client.aclose()
 
 app = FastAPI(title="DataLogFusion API", version="1.0.0", lifespan=lifespan)
 
@@ -98,8 +100,6 @@ async def post_telemetry(vehicle_id: str, data: dict):
         return {"status": "ok", "ingested": True}
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
-    finally:
-        await r.aclose()
 
 
 @app.get("/vehicles")
@@ -142,8 +142,8 @@ async def get_latest():
         if not data:
             return {"error": "No data yet — is the producer running?"}
         return _cast_fields(data)
-    finally:
-        await r.aclose()
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
 
 
 @app.get("/history")
