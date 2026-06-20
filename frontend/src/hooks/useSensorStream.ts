@@ -79,7 +79,7 @@ export const useSensorStream = (activeVehicleId: string | null) => {
 
   const resetEmergency = () => setIsEmergency(false);
 
-  console.log("useSensorStream state:", { activeVehicleId, streamsKeys: Object.keys(streams), currentDataMapKeys: Object.keys(currentDataMap), dataStreamLength: dataStream.length, currentData });
+  console.log("useSensorStream state:", { activeVehicleId, dataStreamLength: dataStream.length, currentData });
 
   return { 
     dataStream, 
