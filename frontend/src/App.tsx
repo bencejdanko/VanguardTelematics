@@ -4,12 +4,8 @@ import { VehicleList } from './components/VehicleList';
 import { TelemetryDashboard } from './components/TelemetryDashboard';
 import { EmergencyAlert } from './components/EmergencyAlert';
 import { useSensorStream } from './hooks/useSensorStream';
-
-export interface Vehicle {
-  id: string;
-  name: string;
-  status: 'healthy' | 'warning' | 'emergency';
-}
+import { Vehicle } from './types';
+import { API_BASE_URL } from './config';
 
 function App() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -20,7 +16,7 @@ function App() {
 
   // Fetch deployed vehicles on mount
   useEffect(() => {
-    fetch('http://localhost:8000/vehicles')
+    fetch(`${API_BASE_URL}/vehicles`)
       .then(r => r.json())
       .then(data => {
         setVehicles(data);

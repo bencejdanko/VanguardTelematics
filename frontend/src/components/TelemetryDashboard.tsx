@@ -1,5 +1,5 @@
 import styles from './TelemetryDashboard.module.css';
-import { SensorData } from '../hooks/useSensorStream';
+import { SensorData } from '../types';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Thermometer, Gauge, NavigationArrow, ShieldWarning, Heartbeat } from '@phosphor-icons/react';
 import { motion } from 'motion/react';

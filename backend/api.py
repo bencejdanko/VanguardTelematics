@@ -71,8 +71,6 @@ def _make_redis() -> aioredis.Redis:
         username=REDIS_USERNAME,
         password=REDIS_PASSWORD,
         decode_responses=True,
-        socket_connect_timeout=10,
-        socket_timeout=10,
     )
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -180,10 +178,20 @@ async def sse_stream():
 async def _sse_generator() -> AsyncGenerator[str, None]:
     """Tails sensor:stream using XREAD BLOCK and yields SSE-formatted events."""
     r = _make_redis()
-    last_id = "$"
 
     try:
         yield ": connected\n\n"
+        
+        # Bootstrap with the last 50 records so the frontend isn't empty
+        history = await r.xrevrange(STREAM_KEY, count=50)
+        last_id = "$"
+        if history:
+            history.reverse()
+            for entry_id, fields in history:
+                last_id = entry_id
+                payload = json.dumps({"id": entry_id, **_cast_fields(fields)})
+                yield f"data: {payload}\n\n"
+                
         while True:
             try:
                 results = await r.xread(
