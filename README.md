@@ -7,6 +7,16 @@ Modified clone of the DataLogFusion firmware from STMicroElectronics:  `\x-cube-
 
 Logs to Serial port - 115200 8N1
 
+The sampling frequency of the measurements is 100 Hz (a sampling period of 10 ms).
+
+```c
+# app_mems.c
+
+#define ALGO_FREQ  100U /* Algorithm frequency 100Hz */
+#define ALGO_PERIOD  (1000U / ALGO_FREQ) /* Algorithm period [ms] = 10ms */
+```
+
+
 Output format:
 
 
