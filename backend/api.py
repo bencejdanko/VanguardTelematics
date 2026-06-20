@@ -79,8 +79,9 @@ def _make_redis() -> aioredis.Redis:
             password=REDIS_PASSWORD,
             decode_responses=True,
             socket_connect_timeout=5,
-            socket_timeout=5,
-            max_connections=10
+            health_check_interval=10,
+            max_connections=100,
+            retry_on_timeout=True
         )
     return redis_client
 
@@ -212,7 +213,6 @@ async def _sse_generator() -> AsyncGenerator[str, None]:
             except Exception as exc:
                 logger.warning("SSE Redis read error: %s", exc)
                 await asyncio.sleep(2)
-                r = _make_redis()
                 continue
 
             if not results:

@@ -37,44 +37,35 @@ export const useSensorStream = (activeVehicleId: string | null) => {
   useEffect(() => {
     if (!activeVehicleId) return;
 
-    const fetchData = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/history?count=${HISTORY_COUNT}`);
-        if (!response.ok) return;
-        
-        const data = await response.json();
-        
-        // Data comes newest first, so we reverse it for chronological plotting
-        const chronological = data.reverse();
-        
-        // Filter and map for the active vehicle
-        const mappedData: SensorData[] = chronological
-          .map((raw: any) => parseSensorData(raw, activeVehicleId))
-          .filter((item: SensorData | null): item is SensorData => item !== null);
+    const source = new EventSource(`${API_BASE_URL}/stream`);
+    let currentStream: SensorData[] = [];
 
-        if (mappedData.length > 0) {
-          setDataStream(mappedData);
+    source.onmessage = (event) => {
+      try {
+        const raw = JSON.parse(event.data);
+        const newPoint = parseSensorData(raw, activeVehicleId);
+        
+        if (newPoint) {
+          currentStream = [...currentStream, newPoint].slice(-HISTORY_COUNT);
+          setDataStream(currentStream);
+          setCurrentData(newPoint);
           
-          const latest = mappedData[mappedData.length - 1];
-          setCurrentData(latest);
-          
-          // Emergency threshold check on the latest point
-          if (checkEmergency(latest)) {
+          if (checkEmergency(newPoint)) {
             setIsEmergency(true);
           }
         }
       } catch (err) {
-        console.error("Error fetching history:", err);
+        // Ignore keepalive or parse errors
       }
     };
 
-    // Initial fetch
-    fetchData();
+    source.onerror = (err) => {
+      console.error("SSE Error:", err);
+    };
 
-    // Poll at configured interval
-    const interval = setInterval(fetchData, HISTORY_POLL_INTERVAL_MS);
-
-    return () => clearInterval(interval);
+    return () => {
+      source.close();
+    };
   }, [activeVehicleId]);
 
   const resetEmergency = () => setIsEmergency(false);
