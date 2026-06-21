@@ -83,31 +83,53 @@ async def analytics_worker():
                     last_id = entry_id
                     vehicle_id = fields.get("vehicle_id", "V-001") # Default for load_sample.py
                     
-                    # 1. Smart Emergency Detection
-                    acc_x = safe_float(fields.get("acc_x", fields.get("acc_x_mg", 0)))
-                    acc_y = safe_float(fields.get("acc_y", fields.get("acc_y_mg", 0)))
-                    acc_z = safe_float(fields.get("acc_z", fields.get("acc_z_mg", 0)))
-
                     if vehicle_id not in vehicle_states:
                         vehicle_states[vehicle_id] = {
                             "tilt_frames": 0,
                             "last_incident_time": 0,
                             "prev_g_force": 1.0,
-                            "base_acc_x": acc_x,
-                            "base_acc_y": acc_y,
-                            "base_acc_z": acc_z,
+                            "last_acc_x": 0.0,
+                            "last_acc_y": 0.0,
+                            "last_acc_z": 980.0,
+                            "last_gyr_x": 0.0,
+                            "last_gyr_y": 0.0,
+                            "last_gyr_z": 0.0,
+                            "last_press": 1013.25,
                         }
                     state = vehicle_states[vehicle_id]
                     
+                    # 1. Smart Emergency Detection
+                    acc_x = safe_float(fields.get("acc_x", fields.get("acc_x_mg", state["last_acc_x"])), state["last_acc_x"])
+                    acc_y = safe_float(fields.get("acc_y", fields.get("acc_y_mg", state["last_acc_y"])), state["last_acc_y"])
+                    acc_z = safe_float(fields.get("acc_z", fields.get("acc_z_mg", state["last_acc_z"])), state["last_acc_z"])
+
+                    # Glitch filter: drop data point if sign flips dramatically
+                    def is_false_signal(curr, prev):
+                        return (curr * prev < 0) and abs(curr - prev) > 1000.0
+
+                    if is_false_signal(acc_x, state["last_acc_x"]) or \
+                       is_false_signal(acc_y, state["last_acc_y"]) or \
+                       is_false_signal(acc_z, state["last_acc_z"]):
+                        acc_x = state["last_acc_x"]
+                        acc_y = state["last_acc_y"]
+                        acc_z = state["last_acc_z"]
+
+                    state["last_acc_x"] = acc_x
+                    state["last_acc_y"] = acc_y
+                    state["last_acc_z"] = acc_z
+
                     acc_mag = math.sqrt(acc_x**2 + acc_y**2 + acc_z**2)
                     g_force = acc_mag / 1000.0
                     jerk = abs(g_force - state["prev_g_force"])
                     state["prev_g_force"] = g_force
                     
                     # Rollover logic using Gyroscope Vector ONLY
-                    gyr_x = safe_float(fields.get("gyr_x", fields.get("gyr_x_mdps", 0)))
-                    gyr_y = safe_float(fields.get("gyr_y", fields.get("gyr_y_mdps", 0)))
-                    gyr_z = safe_float(fields.get("gyr_z", fields.get("gyr_z_mdps", 0)))
+                    gyr_x = safe_float(fields.get("gyr_x", fields.get("gyr_x_mdps", state["last_gyr_x"])), state["last_gyr_x"])
+                    state["last_gyr_x"] = gyr_x
+                    gyr_y = safe_float(fields.get("gyr_y", fields.get("gyr_y_mdps", state["last_gyr_y"])), state["last_gyr_y"])
+                    state["last_gyr_y"] = gyr_y
+                    gyr_z = safe_float(fields.get("gyr_z", fields.get("gyr_z_mdps", state["last_gyr_z"])), state["last_gyr_z"])
+                    state["last_gyr_z"] = gyr_z
                     gyr_mag = math.sqrt(gyr_x**2 + gyr_y**2 + gyr_z**2)
                     
                     # If rotation rate is high (e.g., > 30000 mdps = 30 dps) for a sustained period
@@ -139,7 +161,8 @@ async def analytics_worker():
                         await trigger_radio_dispatch(vehicle_id, incident_type)
 
                     # 2. Predictive Maintenance: Track moving average of Pressure
-                    press = safe_float(fields.get("press_hpa", 1013.25), 1013.25)
+                    press = safe_float(fields.get("press_hpa", state["last_press"]), state["last_press"])
+                    state["last_press"] = press
                     
                     if vehicle_id not in maintenance_windows:
                         maintenance_windows[vehicle_id] = []

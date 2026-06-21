@@ -64,6 +64,25 @@ export const useSensorStream = (activeVehicleId: string | null) => {
         const newPoint = parseSensorData(raw, activeVehicleId);
         
         if (newPoint) {
+          if (currentStream.length > 0) {
+            const last = currentStream[currentStream.length - 1];
+            
+            const isFalseSignal = (curr: number, prev: number) => {
+              return (curr * prev < 0) && Math.abs(curr - prev) > 1000;
+            };
+
+            if (
+              isFalseSignal(newPoint.accelX, last.accelX) ||
+              isFalseSignal(newPoint.accelY, last.accelY) ||
+              isFalseSignal(newPoint.accelZ, last.accelZ)
+            ) {
+              // Drop this false signal and keep using the last normal data point for accelerometer
+              newPoint.accelX = last.accelX;
+              newPoint.accelY = last.accelY;
+              newPoint.accelZ = last.accelZ;
+              newPoint.gForce = last.gForce;
+            }
+          }
           currentStream = [...currentStream, newPoint].slice(-HISTORY_COUNT);
           setDataStream(currentStream);
           setCurrentData(newPoint);
