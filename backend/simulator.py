@@ -21,8 +21,8 @@ async def simulator_worker():
         port=REDIS_PORT,
         username=REDIS_USERNAME,
         password=REDIS_PASSWORD,
-        decode_responses=True,
-        socket_connect_timeout=5,
+        decode_responses=True, socket_connect_timeout=30, socket_timeout=30, retry_on_timeout=True,
+        
     )
     
     vehicles = ["V-002", "V-003", "V-004"]

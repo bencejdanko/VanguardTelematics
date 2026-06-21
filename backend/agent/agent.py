@@ -27,7 +27,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from config import (
     REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD,
     REDIS_STREAM_KEY, REDIS_LATEST_KEY as LATEST_KEY,
-    ASI_API_KEY, AGENT_SEED_PHRASE
+    ASI_API_KEY, AGENT_SEED_PHRASE_DIS
 )
 
 
@@ -46,7 +46,7 @@ CONSECUTIVE_SAMPLES_REQUIRED = 2
 EMA_ALPHA = 0.3
 MIN_BASELINE_SAMPLES = SAMPLE_RATE_HZ * 5
 
-VEHICLE_ID = "ambulance-01"
+VEHICLE_ID = "V-001"
 REDIS_CRASH_EVENT_KEY = "latest_crash_event"
 
 
@@ -221,7 +221,7 @@ client = OpenAI(
 
 agent = Agent(
     name="Predictive-Disaster-Monitor-Agent",
-    seed=AGENT_SEED_PHRASE,
+    seed=AGENT_SEED_PHRASE_DIS,
     port=8001,
     mailbox=True,
     publish_agent_details=True,
@@ -245,16 +245,27 @@ async def _redis_client():
         port=REDIS_PORT,
         username=REDIS_USERNAME,
         password=REDIS_PASSWORD,
-        decode_responses=True,
+        decode_responses=True, socket_connect_timeout=30, socket_timeout=30, retry_on_timeout=True,
     )
 
 
 async def fetch_latest_telemetry() -> dict:
     try:
         r = await _redis_client()
-        data = await r.hgetall(LATEST_KEY)
+        # Read the last 10 entries from the stream to get the latest state of recently active vehicles
+        entries = await r.xrevrange(REDIS_STREAM_KEY, max="+", min="-", count=10)
         await r.aclose()
-        return data
+        
+        if not entries:
+            return {}
+            
+        latest_by_vehicle = {}
+        for entry_id, fields in entries:
+            vid = fields.get("vehicle_id", VEHICLE_ID)
+            if vid not in latest_by_vehicle:
+                latest_by_vehicle[vid] = fields
+                
+        return latest_by_vehicle
     except Exception:
         return {}
 
@@ -412,6 +423,27 @@ async def poll_redis_stream(ctx: Context):
 
 
 # ---------------------------------------------------------------------------
+# Event type classification heuristic
+# ---------------------------------------------------------------------------
+
+def classify_event(triggered: List[str]) -> str:
+    feat = set(triggered)
+    if "vibration" in feat and "accel_mag" in feat and "accel_jerk" in feat:
+        return "Hard Impact / Collision"
+    if "vibration" in feat and "accel_jerk" in feat:
+        return "Spin-Out / Loss of Control"
+    if "vibration" in feat and "accel_mag" in feat:
+        return "Rollover / Impact"
+    if "accel_mag" in feat and "accel_jerk" in feat:
+        return "Hard Braking / Collision"
+    if "vibration" in feat:
+        return "Sustained Rotation Anomaly"
+    if "accel_mag" in feat:
+        return "Acceleration Anomaly"
+    return "Unknown Anomaly"
+
+
+# ---------------------------------------------------------------------------
 # Chat protocol handlers
 # ---------------------------------------------------------------------------
 
@@ -439,13 +471,18 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     telemetry_context = f"Data source: {data_source}\nLatest telemetry data: {json.dumps(telemetry, indent=2)}"
 
     crash_context = ""
+    classification = "Normal Operation"
     if crash_event:
+        triggered = crash_event.get('triggered_features', [])
+        classification = classify_event(triggered)
         crash_context = (
             f"\n\nANOMALY ALERT: A crash/disaster trigger was detected at "
             f"t={crash_event.get('trigger_timestamp')} for vehicle "
             f"{crash_event.get('vehicle_id')}. "
-            f"Triggered features: {crash_event.get('triggered_features')}. "
-            f"Z-scores: {crash_event.get('z_scores')}."
+            f"\nClassified Event Type: {classification}"
+            f"\nTriggered features: {triggered}. "
+            f"\nZ-scores: {crash_event.get('z_scores')}."
+            f"\nUse the Z-scores and triggered features to explain WHY this was classified as a {classification}."
         )
 
     response = 'I am afraid something went wrong and I am unable to answer your question at the moment'
@@ -454,14 +491,22 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             model="asi1",
             messages=[
                 {"role": "system", "content": f"""
-You are a helpful assistant who only answers questions about {subject_matter}. If the user asks
-about any other topics, you should politely say that you do not know about them.
+You are the Predictive Disaster Monitor Dispatch Agent, an AI coordinator for a rural first-responder vehicle safety system.
+Your role is to monitor live vehicle telemetry and coordinate emergency response based on sensor data.
+Maintain a professional, calm, and dispatch-like tone (e.g., "Dispatch to unit...", "Copy that", "Telemetry indicates...").
+You only answer questions regarding {subject_matter}, vehicle status, and safety alerts.
 
 {telemetry_context}{crash_context}
+
+Analyze the telemetry and report the status concisely. If an anomaly is detected, prioritize safety instructions.
+
+IMPORTANT: You MUST ALWAYS begin your very first sentence with exactly this format:
+CLASSIFICATION: {classification}
+
+Then proceed with your dispatch response.
                 """},
                 {"role": "user", "content": text},
             ],
-            max_tokens=2048,
         )
         response = str(r.choices[0].message.content)
     except Exception:

@@ -51,10 +51,10 @@ def load(live: bool = False):
         port=REDIS_PORT,
         username=REDIS_USERNAME,
         password=REDIS_PASSWORD,
-        decode_responses=True,
-        socket_connect_timeout=5,
-        health_check_interval=10,
-        retry_on_timeout=True
+        decode_responses=True, socket_connect_timeout=30, socket_timeout=30, retry_on_timeout=True,
+        
+        
+        
     )
     r.ping()
     print(f"Connected to Redis @ {REDIS_HOST}:{REDIS_PORT}")

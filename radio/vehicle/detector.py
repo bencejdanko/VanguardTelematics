@@ -121,7 +121,7 @@ def run(on_event: Callable[[str], None]) -> None:
     r = redis.Redis(
         host=REDIS_HOST, port=REDIS_PORT,
         username=REDIS_USERNAME, password=REDIS_PASSWORD,
-        decode_responses=True,
+        decode_responses=True, socket_connect_timeout=30, socket_timeout=30, retry_on_timeout=True,
     )
     det = Detector()
     last_id = '$'

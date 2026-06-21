@@ -56,8 +56,8 @@ async def analytics_worker():
         port=REDIS_PORT, 
         username=REDIS_USERNAME, 
         password=REDIS_PASSWORD, 
-        decode_responses=True,
-        socket_connect_timeout=10
+        decode_responses=True, socket_connect_timeout=30, socket_timeout=30, retry_on_timeout=True,
+        
     )
     last_id = "$"
     

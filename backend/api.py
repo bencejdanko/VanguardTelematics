@@ -77,11 +77,11 @@ def _make_redis() -> aioredis.Redis:
             port=REDIS_PORT,
             username=REDIS_USERNAME,
             password=REDIS_PASSWORD,
-            decode_responses=True,
-            socket_connect_timeout=5,
-            health_check_interval=10,
+            decode_responses=True, socket_connect_timeout=30, socket_timeout=30, retry_on_timeout=True,
+            
+            
             max_connections=100,
-            retry_on_timeout=True
+            
         )
     return redis_client
 

@@ -10,8 +10,8 @@ from uagents_core.utils.registration import (
     RegistrationRequestCredentials,
 )
 
-if not AGENTVERSE_KEY:
-    raise ValueError("Missing AGENTVERSE_KEY in .env file!")
+if not AGENTVERSE_KEY_DIS:
+    raise ValueError("Missing AGENTVERSE_KEY_DIS in .env file!")
 
 print("Registering chat agent...")
 register_chat_agent(
@@ -19,8 +19,8 @@ register_chat_agent(
     "https://asi1.ai/ai/predictivedisastermo",
     active=True,
     credentials=RegistrationRequestCredentials(
-        agentverse_api_key=AGENTVERSE_KEY,
-        agent_seed_phrase=AGENT_SEED_PHRASE,        
+        agentverse_api_key=AGENTVERSE_KEY_DIS,
+        agent_seed_phrase=AGENT_SEED_PHRASE_DIS,        
     ),
 )
 print("Registration successful!")
