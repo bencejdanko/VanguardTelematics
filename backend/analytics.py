@@ -14,15 +14,12 @@ except ImportError:
     class SpeakOptions:  # type: ignore[no-redef]
         def __init__(self, **kwargs): pass
 
+from config import (
+    REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD,
+    REDIS_STREAM_KEY as STREAM_KEY, DEEPGRAM_API_KEY
+)
+
 logger = logging.getLogger("datalogfusion.analytics")
-
-REDIS_HOST = os.getenv("REDIS_HOST", "coat-generous-snow-13477.db.redis.io")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "13011"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "AU0X7vgAPgJ6lLt6f4yeZQgwlVIyc0XN")
-STREAM_KEY = os.getenv("REDIS_STREAM_KEY", "sensor:stream")
-
-DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
 
 async def trigger_radio_dispatch(vehicle_id: str, incident_type: str):
     logger.warning(f"EMERGENCY on {vehicle_id}: {incident_type}. Triggering dispatch.")

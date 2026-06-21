@@ -3,6 +3,7 @@ import styles from './App.module.css';
 import { VehicleList } from './components/VehicleList';
 import { TelemetryDashboard } from './components/TelemetryDashboard';
 import { EmergencyAlert } from './components/EmergencyAlert';
+import { ReportsPage } from './components/ReportsPage';
 import { useSensorStream } from './hooks/useSensorStream';
 import { Vehicle } from './types';
 import { API_BASE_URL } from './config';
@@ -10,6 +11,7 @@ import { API_BASE_URL } from './config';
 function App() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'reports'>('dashboard');
   
   // Custom hook tracking streaming data for all vehicles in the background
   const { dataStream, currentData, emergencyType, resetEmergency } = useSensorStream(activeVehicleId);
@@ -43,9 +45,13 @@ function App() {
         vehicles={displayVehicles} 
         activeId={activeVehicleId} 
         onSelect={setActiveVehicleId} 
+        currentPage={currentPage}
+        onNavigate={setCurrentPage}
       />
       
-      {activeVehicle ? (
+      {currentPage === 'reports' ? (
+        <ReportsPage />
+      ) : activeVehicle ? (
         <TelemetryDashboard 
           vehicleName={activeVehicle.name}
           isEmergency={!!emergencyType}

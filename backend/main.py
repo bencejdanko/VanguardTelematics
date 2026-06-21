@@ -14,13 +14,11 @@ Usage:
 
 import os
 import uvicorn
-from dotenv import load_dotenv
-
-load_dotenv()
+from config import API_HOST, API_PORT
 
 if __name__ == "__main__":
-    host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8000"))
+    host = API_HOST
+    port = API_PORT
 
     print(f"Starting DataLogFusion API on http://{host}:{port}")
     print("  GET /health    — Redis health check")
