@@ -63,7 +63,8 @@
 #define DEFAULT_BAUD        B115200
 
 /* --- Tuning --- */
-#define BATCH_SIZE          10      /* flush every N samples (~100 ms @100 Hz) */
+#define BATCH_SIZE          1       /* push every sample immediately */
+#define SAMPLE_INTERVAL_US  250000  /* 0.25 s between samples (4 Hz) */
 #define RECV_BUF_SIZE       256     /* small; we only check reply type byte */
 #define LINE_BUF_SIZE       512
 #define SEND_BUF_SIZE       4096    /* per XADD command */
@@ -179,30 +180,89 @@ static int tcp_send_all(int fd, const char *buf, int len) {
 }
 
 /*
- * Read until we see at least `count` RESP responses (each starts with
- * '+', '-', ':', '$', or '*').  We only care about errors here.
+ * Minimal RESP parser: counts `count` top-level responses from the server.
+ *
+ * XADD replies with a bulk string containing the new entry ID, e.g.:
+ *   $15\r\n1750000000000-0\r\n
+ *
+ * A naive byte scan would treat the '-' in '1750000000000-0' as a RESP
+ * error indicator.  This function properly reads the type byte, then skips
+ * the payload before looking at the next response.
  */
 static int tcp_drain_replies(int fd, int count) {
-    char buf[RECV_BUF_SIZE];
-    int seen = 0;
+    char buf[512];
+    int  blen = 0;   /* valid bytes in buf */
+    int  bpos = 0;   /* read cursor        */
+    int  seen = 0;
+
+    /* Ensure at least `need` bytes are in buf starting at bpos.
+     * Returns 0 on success, -1 on connection error. */
+    #define ENSURE(need) do { \
+        while (blen - bpos < (need)) { \
+            if (blen >= (int)sizeof(buf)) { bpos = blen = 0; } \
+            int _n = (int)recv(fd, buf + blen, (int)(sizeof(buf) - blen - 1), 0); \
+            if (_n <= 0) return -1; \
+            blen += _n; \
+            buf[blen] = '\0'; \
+        } \
+    } while (0)
+
     while (seen < count) {
-        int n = (int)recv(fd, buf, sizeof(buf) - 1, 0);
-        if (n <= 0) return -1;
-        buf[n] = '\0';
-        /* Count RESP response lines (starting character of each reply) */
-        for (int i = 0; i < n; i++) {
-            if (buf[i] == '+' || buf[i] == '-' ||
-                buf[i] == ':' || buf[i] == '$' || buf[i] == '*') {
-                /* Check for error */
-                if (buf[i] == '-') {
-                    fprintf(stderr, "[redis] Server error: %s\n", buf + i);
+        ENSURE(1);
+        char type = buf[bpos++];
+
+        if (type == '+' || type == '-' || type == ':') {
+            /* Simple string / error / integer — read to end of line */
+            ENSURE(2);
+            char *nl = memchr(buf + bpos, '\n', blen - bpos);
+            if (!nl) { bpos = blen; } /* partial — give up on this recv */
+            else {
+                if (type == '-') {
+                    /* Genuine server error: print the message before \r\n */
+                    int start = bpos;
+                    bpos = (int)(nl - buf) + 1;
+                    buf[bpos - 2] = '\0'; /* null-terminate at \r */
+                    fprintf(stderr, "[redis] Server error: -%s\n", buf + start);
+                } else {
+                    bpos = (int)(nl - buf) + 1;
                 }
-                seen++;
             }
+            seen++;
+
+        } else if (type == '$') {
+            /* Bulk string: $N\r\nDATA\r\n  — skip N+2 bytes of payload */
+            ENSURE(2);
+            char *nl = memchr(buf + bpos, '\n', blen - bpos);
+            if (!nl) { bpos = blen; seen++; continue; }
+            int slen = atoi(buf + bpos);
+            bpos = (int)(nl - buf) + 1; /* skip past length line */
+            /* Skip slen data bytes + 2 bytes for trailing \r\n */
+            int skip = slen + 2;
+            while (skip > 0) {
+                int avail = blen - bpos;
+                if (avail >= skip) { bpos += skip; skip = 0; }
+                else {
+                    skip -= avail;
+                    blen = bpos = 0;
+                    int _n = (int)recv(fd, buf, sizeof(buf) - 1, 0);
+                    if (_n <= 0) return -1;
+                    blen = _n; buf[blen] = '\0';
+                }
+            }
+            seen++;
+
+        } else {
+            /* Unknown / inline — skip to next newline */
+            char *nl = memchr(buf + bpos, '\n', blen - bpos);
+            if (nl) bpos = (int)(nl - buf) + 1;
+            else    bpos = blen;
         }
     }
+
+    #undef ENSURE
     return 0;
 }
+
 
 /* ================================================================
  * Serial port helpers
@@ -415,15 +475,20 @@ int main(int argc, char *argv[]) {
         batch_count++;
         total_sent++;
 
-        /* Drain replies in batches to avoid socket buffer buildup */
+        /* Drain replies then throttle to SAMPLE_INTERVAL_US */
         if (batch_count >= BATCH_SIZE) {
             if (tcp_drain_replies(rfd, pending_replies) < 0) {
                 fprintf(stderr, "[redis] drain error\n");
             }
-            printf("[%lld] Pushed %d samples to %s\n",
-                   total_sent, batch_count, REDIS_STREAM);
+            printf("[%lld] Pushed sample to %s\n",
+                   total_sent, REDIS_STREAM);
             batch_count     = 0;
             pending_replies = 0;
+
+            /* Discard serial bytes that piled up while we were sleeping,
+             * then wait out the rest of the interval so we stay at ~4 Hz. */
+            tcflush(sfd, TCIFLUSH);
+            usleep(SAMPLE_INTERVAL_US);
         }
     }
 
