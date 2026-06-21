@@ -9,3 +9,4 @@ deepgram-sdk==3.4.0
 httpx>=0.25.0
 uagents
 openai
+sounddevice>=0.4.6
