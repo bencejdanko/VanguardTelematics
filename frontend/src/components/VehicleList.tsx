@@ -1,5 +1,5 @@
 import styles from './VehicleList.module.css';
-import { Heartbeat, ChartBar } from '@phosphor-icons/react';
+import { ShieldCheck, ChartBar } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 
 interface Vehicle {
@@ -21,9 +21,9 @@ export const VehicleList = ({ vehicles, activeId, onSelect, currentPage, onNavig
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
         <div className={styles.brandIconWrapper}>
-          <Heartbeat weight="bold" />
+          <ShieldCheck weight="bold" />
         </div>
-        <span>DataLog<span className={styles.brandAccent}>Fusion</span></span>
+        <span>Vanguard <span className={styles.brandAccent}>Telematics</span></span>
       </div>
 
       <div className={styles.fleetSection}>
@@ -41,7 +41,7 @@ export const VehicleList = ({ vehicles, activeId, onSelect, currentPage, onNavig
                   onNavigate('dashboard');
                 }}
               >
-                <div className={`${styles.statusIndicator} ${v.status === 'emergency' ? styles.emergency : ''}`} />
+                <div className={`${styles.statusIndicator} ${v.status === 'emergency' ? styles.emergency : v.status === 'dispatch' ? styles.dispatch : ''}`} />
                 <div className={styles.vehicleInfo}>
                   <span className={styles.vehicleName}>{v.name}</span>
                   <span className={styles.vehicleId}>{v.id}</span>

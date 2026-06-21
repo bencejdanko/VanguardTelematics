@@ -7,7 +7,7 @@ import { CybertruckViewer } from './CybertruckViewer';
 
 interface Props {
   vehicleName: string;
-  isEmergency: boolean;
+  status: 'healthy' | 'warning' | 'emergency' | 'dispatch';
   currentData: SensorData | null;
   dataStream: SensorData[];
 }
@@ -29,7 +29,9 @@ const itemVariants = {
 const accelG = (d: SensorData): number =>
   Math.sqrt(d.accelX ** 2 + d.accelY ** 2 + d.accelZ ** 2) / 1000;
 
-export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, dataStream }: Props) => {
+export const TelemetryDashboard = ({ vehicleName, status, currentData, dataStream }: Props) => {
+  const isEmergency = status === 'emergency';
+  const isDispatch = status === 'dispatch';
   return (
     <motion.div
       className={styles.dashboard}
@@ -44,9 +46,9 @@ export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, data
           <p className={styles.subtitle}>Live Hardware Telemetry</p>
         </div>
 
-        <div className={`${styles.statusBadge} ${isEmergency ? styles.statusEmergency : styles.statusHealthy}`}>
-          {isEmergency ? <ShieldWarning size={20} weight="fill" /> : <Heartbeat size={20} weight="bold" />}
-          {isEmergency ? 'Critical Event' : 'System Nominal'}
+        <div className={`${styles.statusBadge} ${isEmergency ? styles.statusEmergency : isDispatch ? styles.statusDispatch : styles.statusHealthy}`}>
+          {isEmergency ? <ShieldWarning size={20} weight="fill" /> : isDispatch ? <NavigationArrow size={20} weight="bold" /> : <Heartbeat size={20} weight="bold" />}
+          {isEmergency ? 'Critical Event' : isDispatch ? 'To be Dispatched' : 'System Nominal'}
         </div>
       </motion.header>
 

@@ -20,5 +20,5 @@ export interface SensorData {
 export interface Vehicle {
   id: string;
   name: string;
-  status: 'healthy' | 'warning' | 'emergency';
+  status: 'healthy' | 'warning' | 'emergency' | 'dispatch';
 }

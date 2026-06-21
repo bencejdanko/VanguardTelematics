@@ -15,7 +15,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'reports'>('dashboard');
   
   // Custom hook tracking streaming data for all vehicles in the background
-  const { dataStream, currentData, emergencyType, resetEmergency } = useSensorStream(activeVehicleId);
+  const { dataStream, currentData, emergencyType, resetEmergency, v1Live } = useSensorStream(activeVehicleId);
 
   // Fetch deployed vehicles on mount
   useEffect(() => {
@@ -32,10 +32,17 @@ function App() {
 
   // Sync the vehicle list status with any live emergencies from the stream
   const displayVehicles = vehicles.map(v => {
-    if (v.id === activeVehicleId && emergencyType) {
-      return { ...v, status: 'emergency' as const };
+    let status = v.status;
+    
+    // For V-001, if no new stream is coming in, it defaults to dispatch
+    if (v.id === 'V-001' && !v1Live) {
+      status = 'dispatch';
     }
-    return v;
+
+    if (v.id === activeVehicleId && emergencyType) {
+      status = 'emergency';
+    }
+    return { ...v, status };
   });
 
   const activeVehicle = displayVehicles.find(v => v.id === activeVehicleId);

@@ -99,6 +99,11 @@
   animation: pulse-emergency 1.5s infinite;
 }
 
+.statusIndicator.dispatch {
+  background: var(--accent-blue);
+  box-shadow: 0 0 12px var(--accent-blue-glow);
+}
+
 .vehicleInfo {
   display: flex;
   flex-direction: column;

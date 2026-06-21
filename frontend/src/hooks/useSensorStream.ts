@@ -36,6 +36,7 @@ export const useSensorStream = (activeVehicleId: string | null) => {
   const [dataStream, setDataStream] = useState<SensorData[]>([]);
   const [currentData, setCurrentData] = useState<SensorData | null>(null);
   const [emergencyType, setEmergencyType] = useState<string | null>(null);
+  const [v1Live, setV1Live] = useState(false);
   const acknowledgedRef = useRef(false);
 
   useEffect(() => {
@@ -43,10 +44,19 @@ export const useSensorStream = (activeVehicleId: string | null) => {
 
     const source = new EventSource(`${API_BASE_URL}/stream`);
     let currentStream: SensorData[] = [];
+    let timeoutId: NodeJS.Timeout;
 
     source.onmessage = (event) => {
       try {
         const raw = JSON.parse(event.data);
+        const vehicleId = raw.vehicle_id || 'V-001';
+        
+        if (vehicleId === 'V-001') {
+          setV1Live(true);
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => setV1Live(false), 3000);
+        }
+
         const newPoint = parseSensorData(raw, activeVehicleId);
         
         if (newPoint) {
@@ -74,6 +84,7 @@ export const useSensorStream = (activeVehicleId: string | null) => {
     };
 
     return () => {
+      clearTimeout(timeoutId);
       source.close();
     };
   }, [activeVehicleId]);
@@ -83,13 +94,12 @@ export const useSensorStream = (activeVehicleId: string | null) => {
     acknowledgedRef.current = true;
   };
 
-  console.log("useSensorStream state:", { activeVehicleId, dataStreamLength: dataStream.length, currentData });
-
   return { 
     dataStream, 
     currentData, 
     emergencyType, 
-    resetEmergency 
+    resetEmergency,
+    v1Live
   };
 };
 

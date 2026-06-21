@@ -1,7 +1,7 @@
 """
 api.py
 ------
-DataLogFusion Backend — HTTP API Server
+Vanguard Telematics Backend — HTTP API Server
 
 Reads live data from Redis Cloud and exposes it to the dashboard via HTTP.
 
@@ -32,7 +32,7 @@ from config import (
     REDIS_STREAM_KEY as STREAM_KEY, REDIS_LATEST_KEY as LATEST_KEY
 )
 
-logger = logging.getLogger("datalogfusion.api")
+logger = logging.getLogger("vanguard.api")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     if redis_client is not None:
         await redis_client.aclose()
 
-app = FastAPI(title="DataLogFusion API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Vanguard Telematics API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
