@@ -13,9 +13,13 @@ Endpoints:
 """
 
 import asyncio
+import io
+import csv
 import json
 import logging
+import math
 import os
+from datetime import datetime
 from typing import AsyncGenerator
 
 import redis.asyncio as aioredis
@@ -234,6 +238,213 @@ async def _sse_generator() -> AsyncGenerator[str, None]:
                     yield f"data: {payload}\n\n"
     finally:
         pass
+
+@app.get("/report")
+async def get_report(count: int = 5000):
+    """
+    Computes a comprehensive fleet report from the last `count` stream entries.
+    """
+    count = min(count, 5000)
+    r = _make_redis()
+    
+    try:
+        entries = await r.xrevrange(STREAM_KEY, count=count)
+    except Exception as exc:
+        logger.error("Error fetching stream for report: %s", exc)
+        return {"status": "error", "message": str(exc)}
+        
+    vehicles_data = {}
+    incidents = []
+    
+    # State tracking per vehicle for incident detection
+    # Format: { vehicle_id: { prev_g_force, tilt_frames, last_incident_time } }
+    v_states = {}
+
+    # Since xrevrange returns newest first, we process in reverse chronological order.
+    # To correctly calculate jerk (change in g-force) and tilt frames over time,
+    # we actually need to process them chronologically.
+    entries.reverse()
+
+    for entry_id, fields in entries:
+        raw = _cast_fields(fields)
+        v_id = raw.get("vehicle_id", "V-001")
+        
+        if v_id not in vehicles_data:
+            vehicles_data[v_id] = {
+                "data_points": 0,
+                "press_sum": 0, "press_min": float('inf'), "press_max": float('-inf'),
+                "g_sum": 0, "g_max": 0,
+                "pitch_sum": 0, "pitch_max": 0,
+                "roll_sum": 0, "roll_max": 0,
+                "incidents_count": 0
+            }
+        if v_id not in v_states:
+            v_states[v_id] = {
+                "prev_g_force": 1.0,
+                "tilt_frames": 0,
+                "last_incident_time": 0,
+            }
+            
+        vd = vehicles_data[v_id]
+        vs = v_states[v_id]
+        vd["data_points"] += 1
+        
+        # Pressure stats
+        press = float(raw.get("press_hpa", raw.get("press", 1013.25)))
+        vd["press_sum"] += press
+        vd["press_min"] = min(vd["press_min"], press)
+        vd["press_max"] = max(vd["press_max"], press)
+        
+        # G-Force stats
+        g_force = float(raw.get("g_force", 1.0))
+        vd["g_sum"] += g_force
+        vd["g_max"] = max(vd["g_max"], g_force)
+        
+        # Pitch/Roll stats
+        pitch = float(raw.get("pitch_deg", raw.get("pitch", 0)))
+        roll = float(raw.get("roll_deg", raw.get("roll", 0)))
+        vd["pitch_sum"] += pitch
+        vd["roll_sum"] += roll
+        vd["pitch_max"] = max(vd["pitch_max"], abs(pitch))
+        vd["roll_max"] = max(vd["roll_max"], abs(roll))
+        
+        # Incident detection logic (re-implemented simply for the report)
+        jerk = abs(g_force - vs["prev_g_force"])
+        vs["prev_g_force"] = g_force
+        
+        # simplified rollover check (based on roll/pitch rather than full vector for report)
+        if abs(roll) > 60 or abs(pitch) > 60:
+            vs["tilt_frames"] += 1
+        else:
+            vs["tilt_frames"] = 0
+            
+        incident_type = None
+        # approx timestamp from stream ID (ms)
+        ts_ms = int(entry_id.split("-")[0])
+        current_time_sec = ts_ms / 1000.0
+        
+        if current_time_sec - vs["last_incident_time"] > 5.0:
+            if g_force > 6.0 and jerk > 4.0:
+                incident_type = "High-Impact Crash"
+                vs["last_incident_time"] = current_time_sec
+            elif vs["tilt_frames"] >= 50:
+                incident_type = "Rollover"
+                vs["last_incident_time"] = current_time_sec
+                vs["tilt_frames"] = 0
+                
+        if incident_type:
+            dt = datetime.fromtimestamp(current_time_sec).isoformat()
+            vd["incidents_count"] += 1
+            incidents.append({
+                "vehicle_id": v_id,
+                "type": incident_type,
+                "stream_id": entry_id,
+                "g_force": round(g_force, 2),
+                "jerk": round(jerk, 2),
+                "timestamp_approx": dt
+            })
+            
+    # Finalize aggregates
+    per_vehicle = {}
+    fleet_press_sum = 0
+    fleet_g_sum = 0
+    total_data_points = 0
+    
+    for v_id, vd in vehicles_data.items():
+        dp = vd["data_points"]
+        total_data_points += dp
+        fleet_press_sum += vd["press_sum"]
+        fleet_g_sum += vd["g_sum"]
+        
+        if dp > 0:
+            per_vehicle[v_id] = {
+                "data_points": dp,
+                "avg_pressure": round(vd["press_sum"] / dp, 2),
+                "min_pressure": round(vd["press_min"], 2),
+                "max_pressure": round(vd["press_max"], 2),
+                "avg_g_force": round(vd["g_sum"] / dp, 2),
+                "max_g_force": round(vd["g_max"], 2),
+                "avg_pitch": round(vd["pitch_sum"] / dp, 2),
+                "avg_roll": round(vd["roll_sum"] / dp, 2),
+                "max_abs_pitch": round(vd["pitch_max"], 2),
+                "max_abs_roll": round(vd["roll_max"], 2),
+                "incidents_count": vd["incidents_count"]
+            }
+
+    # Reverse incidents so newest is first
+    incidents.reverse()
+
+    earliest = datetime.fromtimestamp(int(entries[0][0].split("-")[0]) / 1000.0).isoformat() if entries else None
+    latest = datetime.fromtimestamp(int(entries[-1][0].split("-")[0]) / 1000.0).isoformat() if entries else None
+
+    return {
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "stream_depth": len(entries),
+        "vehicles": list(vehicles_data.keys()),
+        "fleet_summary": {
+            "total_vehicles": len(vehicles_data),
+            "vehicles_reporting": len([v for v in vehicles_data.values() if v["data_points"] > 0]),
+            "total_data_points": total_data_points,
+            "time_range": {
+                "earliest": earliest,
+                "latest": latest
+            }
+        },
+        "per_vehicle": per_vehicle,
+        "incidents": incidents,
+        "fleet_averages": {
+            "pressure": round(fleet_press_sum / total_data_points, 2) if total_data_points > 0 else 0,
+            "g_force": round(fleet_g_sum / total_data_points, 2) if total_data_points > 0 else 0
+        }
+    }
+
+
+@app.get("/export/csv")
+async def export_csv(count: int = 5000):
+    """
+    Returns the raw Redis stream data as a downloadable CSV file.
+    """
+    count = min(count, 5000)
+    r = _make_redis()
+    
+    try:
+        entries = await r.xrevrange(STREAM_KEY, count=count)
+    except Exception as exc:
+        logger.error("Error fetching stream for export: %s", exc)
+        return {"status": "error", "message": str(exc)}
+        
+    if not entries:
+        return {"status": "error", "message": "No data available"}
+        
+    # Standardize fields for CSV based on first entry or a known superset
+    all_fields = set()
+    for _, fields in entries:
+        all_fields.update(fields.keys())
+    
+    # Ensure vehicle_id is first, then stream_id, then others
+    header = ["stream_id", "vehicle_id"] + sorted([f for f in all_fields if f != "vehicle_id"])
+    
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=header)
+    writer.writeheader()
+    
+    for entry_id, fields in entries:
+        row = {"stream_id": entry_id}
+        row.update(fields)
+        if "vehicle_id" not in row:
+            row["vehicle_id"] = "V-001"
+        writer.writerow(row)
+        
+    csv_content = output.getvalue()
+    
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=fleet_data_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+        }
+    )
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
