@@ -11,9 +11,10 @@ import json
 import os
 import redis.asyncio as aioredis
 from dotenv import load_dotenv
-
+import numpy as np
 from openai import OpenAI
-from uagents import Context, Protocol, Agent, Model
+
+from uagents import Agent, Context, Model, Protocol
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
@@ -21,6 +22,7 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
+from models import SharedAgentState
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -442,23 +444,31 @@ def classify_event(triggered: List[str]) -> str:
         return "Acceleration Anomaly"
     return "Unknown Anomaly"
 
+def _bar(z: float, width: int = 18) -> str:
+    filled = min(int(abs(z) / max(abs(z), 1) * width), width)
+    return "[" + "#" * filled + "." * (width - filled) + f"] z={z:+.1f}"
+
+def format_z_score_analysis(crash_event: dict) -> str:
+    triggered_features = crash_event.get('triggered_features', [])
+    z_scores = crash_event.get('z_scores', {})
+    
+    lines = []
+    lines.append("\n```text")
+    lines.append("Feature z-scores (threshold = ±3.0):")
+    for feat, z in sorted(z_scores.items(), key=lambda x: -abs(x[1])):
+        marker = " << TRIGGERED" if feat in triggered_features else ""
+        lines.append(f"  {feat:<16} {_bar(z)}{marker}")
+    lines.append("```")
+    return "\n".join(lines)
+
 
 # ---------------------------------------------------------------------------
-# Chat protocol handlers
+# Query Processing Logic
 # ---------------------------------------------------------------------------
 
-@protocol.on_message(ChatMessage)
-async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-    await ctx.send(
-        sender,
-        ChatAcknowledgement(timestamp=datetime.now(), acknowledged_msg_id=msg.msg_id),
-    )
-
-    text = ''
-    for item in msg.content:
-        if isinstance(item, TextContent):
-            text += item.text
-
+async def process_disaster_query(ctx: Context, query: str) -> str:
+    ctx.logger.info(f"Processing query: {query}")
+    
     telemetry = await fetch_latest_telemetry()
     crash_event = await fetch_latest_crash_event()
 
@@ -505,12 +515,42 @@ CLASSIFICATION: {classification}
 
 Then proceed with your dispatch response.
                 """},
-                {"role": "user", "content": text},
+                {"role": "user", "content": query},
             ],
         )
         response = str(r.choices[0].message.content)
     except Exception:
         ctx.logger.exception('Error querying model')
+
+    if crash_event:
+        response += "\n\n" + format_z_score_analysis(crash_event)
+
+    return response
+
+# ---------------------------------------------------------------------------
+# Message Handlers
+# ---------------------------------------------------------------------------
+
+@agent.on_message(SharedAgentState)
+async def handle_shared_state(ctx: Context, sender: str, state: SharedAgentState):
+    """Handler for messages routed through the Orchestrator."""
+    response = await process_disaster_query(ctx, state.query)
+    state.result = response
+    await ctx.send(sender, state)
+
+@protocol.on_message(ChatMessage)
+async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
+    """Handler for direct user messages via Agentverse UI."""
+    await ctx.send(
+        sender,
+        ChatAcknowledgement(timestamp=datetime.now(), acknowledged_msg_id=msg.msg_id),
+    )
+
+    text = " ".join(
+        item.text for item in msg.content if isinstance(item, TextContent)
+    )
+    
+    response = await process_disaster_query(ctx, text)
 
     await ctx.send(sender, ChatMessage(
         timestamp=datetime.now(timezone.utc),
@@ -521,11 +561,9 @@ Then proceed with your dispatch response.
         ]
     ))
 
-
 @protocol.on_message(ChatAcknowledgement)
 async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
     pass
-
 
 agent.include(protocol, publish_manifest=True)
 

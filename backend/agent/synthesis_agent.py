@@ -14,6 +14,7 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
+from models import SharedAgentState
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from config import (
@@ -71,18 +72,8 @@ async def fetch_historical_telemetry(limit: int = 500) -> list:
     except Exception as e:
         return []
 
-@protocol.on_message(ChatMessage)
-async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-    await ctx.send(
-        sender,
-        ChatAcknowledgement(timestamp=datetime.now(), acknowledged_msg_id=msg.msg_id),
-    )
-
-    text = ''
-    for item in msg.content:
-        if isinstance(item, TextContent):
-            text += item.text
-
+async def process_synthesis_query(ctx: Context, query: str) -> str:
+    ctx.logger.info(f"Processing synthesis query: {query}")
     ctx.logger.info("Fetching 500 rows of historical telemetry for synthesis...")
     history = await fetch_historical_telemetry(limit=500)
 
@@ -108,12 +99,37 @@ When the user asks a question:
 2. Summarize key trends, identify overall data behavior, and synthesize insights over the time window.
 3. Be analytical and data-driven in your summary.
                 """},
-                {"role": "user", "content": text},
+                {"role": "user", "content": query},
             ],
         )
         response = str(r.choices[0].message.content)
     except Exception:
         ctx.logger.exception('Error querying model')
+
+    return response
+
+
+@agent.on_message(SharedAgentState)
+async def handle_shared_state(ctx: Context, sender: str, state: SharedAgentState):
+    """Handler for messages routed through the Orchestrator."""
+    response = await process_synthesis_query(ctx, state.query)
+    state.result = response
+    await ctx.send(sender, state)
+
+
+@protocol.on_message(ChatMessage)
+async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
+    """Handler for direct user messages via Agentverse UI."""
+    await ctx.send(
+        sender,
+        ChatAcknowledgement(timestamp=datetime.now(), acknowledged_msg_id=msg.msg_id),
+    )
+
+    text = " ".join(
+        item.text for item in msg.content if isinstance(item, TextContent)
+    )
+
+    response = await process_synthesis_query(ctx, text)
 
     await ctx.send(sender, ChatMessage(
         timestamp=datetime.now(timezone.utc),
