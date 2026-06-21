@@ -1,8 +1,6 @@
 # DataLogFusion Clone
 
-Repurposed from https://www.st.com/en/embedded-software/x-cube-mems1.html
-
-Modified clone of the DataLogFusion firmware from STMicroElectronics:  `\x-cube-mems1\Projects\NUCLEO-F401RE\Applications\IKS5A1\DataLogFusion`
+Repurposed from https://www.st.com/en/embedded-software/x-cube-mems1.html. Modified clone of the DataLogFusion firmware from STMicroElectronics:  `\x-cube-mems1\Projects\NUCLEO-F401RE\Applications\IKS5A1\DataLogFusion`
 
 
 Logs to Serial port - 115200 8N1
@@ -95,3 +93,11 @@ stty baud=115200 < /dev/serusb1
 # verify 
 stty < /dev/serusb1
 ```
+
+# Raspberry Pi Hardware Sensor Code
+
+We have cloned QNX's example repository for sensors: 
+
+https://github.com/qnx/Raspberry-Pi-Hardware-Component-Samples
+
+And modified for "poor mans sentry mode", where we use an infrared sensor to start a camera only when infrared activity is detected
