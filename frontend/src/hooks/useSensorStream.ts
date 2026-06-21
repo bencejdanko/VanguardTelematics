@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SensorData } from '../types';
 import { API_BASE_URL, HISTORY_POLL_INTERVAL_MS, HISTORY_COUNT, SENSOR_THRESHOLDS } from '../config';
 
@@ -36,6 +36,7 @@ export const useSensorStream = (activeVehicleId: string | null) => {
   const [dataStream, setDataStream] = useState<SensorData[]>([]);
   const [currentData, setCurrentData] = useState<SensorData | null>(null);
   const [emergencyType, setEmergencyType] = useState<string | null>(null);
+  const acknowledgedRef = useRef(false);
 
   useEffect(() => {
     if (!activeVehicleId) return;
@@ -55,7 +56,12 @@ export const useSensorStream = (activeVehicleId: string | null) => {
           
           const incidentType = checkEmergency(newPoint);
           if (incidentType) {
-            setEmergencyType(incidentType);
+            if (!acknowledgedRef.current) {
+              setEmergencyType(incidentType);
+            }
+          } else {
+            acknowledgedRef.current = false;
+            setEmergencyType(null);
           }
         }
       } catch (err) {
@@ -72,7 +78,10 @@ export const useSensorStream = (activeVehicleId: string | null) => {
     };
   }, [activeVehicleId]);
 
-  const resetEmergency = () => setEmergencyType(null);
+  const resetEmergency = () => {
+    setEmergencyType(null);
+    acknowledgedRef.current = true;
+  };
 
   console.log("useSensorStream state:", { activeVehicleId, dataStreamLength: dataStream.length, currentData });
 

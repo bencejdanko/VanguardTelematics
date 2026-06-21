@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 import json
+import time
+import math
 import redis.asyncio as aioredis
 try:
     from deepgram import DeepgramClient, SpeakOptions
@@ -64,6 +66,8 @@ async def analytics_worker():
     
     # State for predictive maintenance
     maintenance_windows = {}
+    # State for emergency detection
+    vehicle_states = {}
 
     while True:
         try:
@@ -76,22 +80,56 @@ async def analytics_worker():
                     last_id = entry_id
                     vehicle_id = fields.get("vehicle_id", "V-001") # Default for load_sample.py
                     
-                    # 1. Emergency Detection: High-Impact Crash (G-Force > 4.0) or Rollover (Roll/Pitch > 60)
-                    import math
+                    # 1. Smart Emergency Detection
+                    acc_x = float(fields.get("acc_x", fields.get("acc_x_mg", 0)))
+                    acc_y = float(fields.get("acc_y", fields.get("acc_y_mg", 0)))
+                    acc_z = float(fields.get("acc_z", fields.get("acc_z_mg", 0)))
+
+                    if vehicle_id not in vehicle_states:
+                        vehicle_states[vehicle_id] = {
+                            "tilt_frames": 0,
+                            "last_incident_time": 0,
+                            "prev_g_force": 1.0,
+                            "base_acc_x": acc_x,
+                            "base_acc_y": acc_y,
+                            "base_acc_z": acc_z,
+                        }
+                    state = vehicle_states[vehicle_id]
                     
-                    acc_x = float(fields.get("acc_x", 0))
-                    acc_y = float(fields.get("acc_y", 0))
-                    acc_z = float(fields.get("acc_z", 0))
-                    roll = float(fields.get("roll", 0))
-                    pitch = float(fields.get("pitch", 0))
+                    acc_mag = math.sqrt(acc_x**2 + acc_y**2 + acc_z**2)
+                    g_force = acc_mag / 1000.0
+                    jerk = abs(g_force - state["prev_g_force"])
+                    state["prev_g_force"] = g_force
                     
-                    g_force = math.sqrt(acc_x**2 + acc_y**2 + acc_z**2) / 1000.0
+                    # Rollover logic using 3D acceleration vector (robust against Euler lock/offsets)
+                    base_x = state["base_acc_x"]
+                    base_y = state["base_acc_y"]
+                    base_z = state["base_acc_z"]
+                    base_mag = math.sqrt(base_x**2 + base_y**2 + base_z**2)
                     
+                    if acc_mag > 0 and base_mag > 0:
+                        dot_product = (acc_x * base_x) + (acc_y * base_y) + (acc_z * base_z)
+                        cos_theta = dot_product / (acc_mag * base_mag)
+                        # cos(60 degrees) = 0.5. If cos_theta < 0.5, tilt is > 60 degrees.
+                        if cos_theta < 0.5:
+                            state["tilt_frames"] += 1
+                        else:
+                            state["tilt_frames"] = 0
+                    else:
+                        state["tilt_frames"] = 0
+                        
                     incident_type = None
-                    if g_force > 4.0:
-                        incident_type = "High-Impact Crash"
-                    elif abs(roll) > 60 or abs(pitch) > 60:
-                        incident_type = "Rollover"
+                    current_time = time.time()
+                    
+                    # Cooldown of 5 seconds between reported incidents
+                    if current_time - state["last_incident_time"] > 5.0:
+                        if g_force > 6.0 and jerk > 4.0:
+                            incident_type = "High-Impact Crash"
+                            state["last_incident_time"] = current_time
+                        elif state["tilt_frames"] >= 50:
+                            incident_type = "Rollover"
+                            state["last_incident_time"] = current_time
+                            state["tilt_frames"] = 0 # reset after trigger
 
                     if incident_type:
                         # Broadcast emergency to SSE listeners via Redis PubSub

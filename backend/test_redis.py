@@ -1,15 +1,22 @@
 import asyncio
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import redis.asyncio as aioredis
-from config import REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD, STREAM_KEY
 
-async def test():
+async def main():
     r = aioredis.Redis(
-        host=REDIS_HOST, port=REDIS_PORT, username=REDIS_USERNAME, password=REDIS_PASSWORD, decode_responses=True
+        host=os.getenv('REDIS_HOST'), 
+        port=int(os.getenv('REDIS_PORT')), 
+        username=os.getenv('REDIS_USERNAME'), 
+        password=os.getenv('REDIS_PASSWORD'), 
+        decode_responses=True
     )
-    print("Fetching count=6...")
-    entries = await r.xrevrange(STREAM_KEY, count=6)
-    print(f"Got {len(entries)} entries")
+    res = await r.xrevrange(os.getenv('REDIS_STREAM_KEY'), count=1)
+    for entry_id, fields in res:
+        print(f"entry_id: {entry_id}")
+        for k, v in fields.items():
+            print(f"  {k}: {v} (type: {type(v)})")
+        break
     await r.aclose()
-
-if __name__ == "__main__":
-    asyncio.run(test())
+asyncio.run(main())

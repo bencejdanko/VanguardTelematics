@@ -60,9 +60,16 @@
   animation: pulse-emergency 1.5s infinite;
 }
 
-.kpiGrid {
+.heroGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: 1.7fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.statStack {
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
@@ -71,6 +78,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  justify-content: center;
 }
 
 .kpiLabel {
@@ -132,7 +141,22 @@
 }
 
 @media (max-width: 1024px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+  }
+  .statStack {
+    flex-direction: row;
+  }
   .chartsGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard {
+    padding: 24px;
+  }
+  .statStack {
+    flex-direction: column;
   }
 }
