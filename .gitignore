@@ -1,0 +1,3 @@
+redis_stream.py
+*.pyc
+redis-stream/main.c

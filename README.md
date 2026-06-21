@@ -39,3 +39,59 @@ timestamp,acc_x_mg,acc_y_mg,acc_z_mg,gyr_x_mdps,gyr_y_mdps,gyr_z_mdps,mag_x_mgau
 | **`pitch_deg`** | Float | Degrees | Estimated device **Pitch** angle from MotionFX Sensor Fusion |
 | **`yaw_deg`** | Float | Degrees | Estimated device **Yaw** (heading) angle from MotionFX Sensor Fusion |
 
+---
+
+QNX configuration
+
+Plug in the kit.
+
+```bash
+[qnxuser@qnxpi18 ~]$ usb -v
+USB 0 (XHCI) v10.00, v1.01 DDK, v2.00 HCD, DLL: Active
+    Control, Interrupt, Bulk(SG), Isoch(Stream), High Speed, Super Speed, DMA:32-bit
+
+Device Address             : 1
+Upstream Host Controller   : 0
+Upstream Device Address    : 0
+Upstream Port              : 1
+Upstream Port Speed        : Full
+Vendor                     : 0x0483 (STMicroelectronics)
+Product                    : 0x374b (STM32 STLink)
+Device Release             : r1.00
+Class                      : 0xef (Miscellaneous)
+Subclass                   : 0x02
+Protocol                   : 0x01
+Max PacketSize0            : 64
+Configurations             : 1
+  Configuration            : 1
+    Attributes             : 0x80 (Bus-powered)
+    Max Power              : 300 mA
+
+USB 1 (XHCI) v10.00, v1.01 DDK, v2.00 HCD, DLL: Active
+    Control, Interrupt, Bulk(SG), Isoch(Stream), High Speed, Super Speed, DMA:32-bit
+```
+
+You must configure the the driver tool to help the pi/qnx to understand the USB 
+
+https://devblog.qnx.com/get-gps-data-on-qnx-with-a-usb-gps/
+
+```bash
+# you can request the binary from john in the discord
+# or it is in the tools somewhere :D
+scp devc-serusb qnxuser@172.20.10.7:/tmp/
+
+# give permissions to the binary and configure anything active
+chmod +x /tmp/devc-serusb
+sudo /tmp/devc-serusb
+
+# check what serial line the USB device is using
+ls -l /dev/ser*
+
+# ex gives me /dev/serusb1
+
+# set the correct baud rate to that line
+stty baud=115200 < /dev/serusb1
+
+# verify 
+stty < /dev/serusb1
+```
