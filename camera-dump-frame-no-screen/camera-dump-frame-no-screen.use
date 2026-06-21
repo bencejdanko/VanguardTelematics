@@ -1,0 +1,13 @@
+%C - Use callback mode to dump raw frames.
+
+Syntax:
+    camera-dump-frame-no-screen [options]
+
+Options
+    -f Absolute path to a folder to where camera-dump-frame-no-screen dumps frames. Default folder path is /data/share/sensor.
+    -u camera_unit Camera unit to use; if not specified, CAMERA_UNIT_1 will be used.
+
+Examples
+    camera-dump-frame-no-screen
+    camera-dump-frame-no-screen -u 2
+    camera-dump-frame-no-screen -f /data/home/qnxuser

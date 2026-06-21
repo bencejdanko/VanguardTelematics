@@ -99,5 +99,18 @@ stty < /dev/serusb1
 We have cloned QNX's example repository for sensors: 
 
 https://github.com/qnx/Raspberry-Pi-Hardware-Component-Samples
+(pi sensor sample code)
+
+https://gitlab.com/qnx/projects/camera-projects/applications/camera-dump-frame-no-screen
+(camera sample code)
 
 And modified for "poor mans sentry mode", where we use an infrared sensor to start a camera only when infrared activity is detected
+
+## Wiring IR Obstacle Sensor 
+
+Wiring: Connected VCC to 3.3V to protect the Pi's GPIO pins, GND to ground, and SIG (Signal / OUT) to GPIO 21.
+
+```
+# ssh helper shortcut 
+ssh qnxuser@172.20.10.7
+```

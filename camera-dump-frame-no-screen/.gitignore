@@ -1,0 +1,40 @@
+# Ignore development files
+# VS Code
+.vscode*
+*.code-workspace
+# Coverity VS Code plugin
+.codesight/
+# Unit test artifacts
+/**/unittests/**/lcov_report
+/**/unittests/**/html
+/**/unittests/**/coverage.info*
+/**/unittests/**/linux-x86_64
+/**/unittests/**/stublist.txt
+/**/unittests/**/source.c
+
+# Ignore build artifacts
+# Binary executables
+/**/x86/o*/*
+!/**/x86/o*/*.*
+!/**/x86/o*/Makefile
+/**/x86_64/o*/*
+!/**/x86_64/o*/*.*
+!/**/x86_64/o*/Makefile
+/**/arm/o*/*
+!/**/arm/o*/*.*
+!/**/arm/o*/Makefile
+/**/aarch64/o*/*
+!/**/aarch64/o*/*.*
+!/**/aarch64/o*/Makefile
+/**/aarch64/le/imr_defisheye_example
+# Libraries and symbols
+*.so
+*.a
+*.sym
+# Compiled shaders
+*.spv
+# Temporary build artifacts
+*.o
+*.dep
+*.pinfo
+*.map
