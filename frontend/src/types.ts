@@ -10,9 +10,10 @@ export interface SensorData {
   magY: number;
   magZ: number;
   pressure: number;
-  temperature: number;
+  temperature?: number;
   pitch: number;
   roll: number;
+  yaw?: number;
 }
 
 export interface Vehicle {

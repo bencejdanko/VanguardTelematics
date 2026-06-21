@@ -7,20 +7,21 @@ const parseSensorData = (raw: any, activeVehicleId: string): SensorData | null =
   if (vehicle_id !== activeVehicleId) return null;
 
   return {
-    time: raw.time || new Date(Number(raw.stream_id?.split('-')[0] || Date.now())).toLocaleTimeString(),
-    accelX: raw.acc_x_mg || 0,
-    accelY: raw.acc_y_mg || 0,
-    accelZ: raw.acc_z_mg || 0,
-    gyroX: raw.gyr_x_mdps || 0,
-    gyroY: raw.gyr_y_mdps || 0,
-    gyroZ: raw.gyr_z_mdps || 0,
-    magX: raw.mag_x_mgauss || 0,
-    magY: raw.mag_y_mgauss || 0,
-    magZ: raw.mag_z_mgauss || 0,
-    pressure: raw.press_hpa || 0,
-    temperature: Number(raw.temp || raw.temperature || raw.roll_deg) || 0,
-    pitch: raw.pitch_deg || 0,
-    roll: raw.roll_deg || 0,
+    time: raw.ts || new Date(Number(raw.stream_id?.split('-')[0] || Date.now())).toLocaleTimeString(),
+    accelX: raw.acc_x || 0,
+    accelY: raw.acc_y || 0,
+    accelZ: raw.acc_z || 0,
+    gyroX: raw.gyr_x || 0,
+    gyroY: raw.gyr_y || 0,
+    gyroZ: raw.gyr_z || 0,
+    magX: raw.mag_x || 0,
+    magY: raw.mag_y || 0,
+    magZ: raw.mag_z || 0,
+    pressure: raw.press || 0,
+    // temperature: Number(raw.temp || raw.temperature || raw.roll_deg) || 0,
+    pitch: raw.pitch || 0,
+    roll: raw.roll || 0,
+    yaw: raw.yaw || 0,
   };
 };
 

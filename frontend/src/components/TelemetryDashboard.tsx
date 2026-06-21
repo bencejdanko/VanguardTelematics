@@ -49,16 +49,16 @@ export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, data
         <motion.div variants={itemVariants} className={styles.kpiGrid}>
           <div className={`${styles.kpiCard} glass-panel`}>
             <div className={styles.kpiLabel}><Thermometer size={18} weight="duotone" /> Core Temp</div>
-            <div className={`${styles.kpiValue} mono`}>{currentData.temperature.toFixed(2)}<span className={styles.kpiUnit}>°C</span></div>
+            <div className={`${styles.kpiValue} mono`}>{currentData.temperature !== undefined ? currentData.temperature.toFixed(2) : 'N/A'}<span className={styles.kpiUnit}>°C</span></div>
           </div>
           <div className={`${styles.kpiCard} glass-panel`}>
             <div className={styles.kpiLabel}><Gauge size={18} weight="duotone" /> Pressure</div>
             <div className={`${styles.kpiValue} mono`}>{currentData.pressure.toFixed(1)}<span className={styles.kpiUnit}>hPa</span></div>
           </div>
           <div className={`${styles.kpiCard} glass-panel`}>
-            <div className={styles.kpiLabel}><NavigationArrow size={18} weight="duotone" /> Pitch / Roll</div>
-            <div className={`${styles.kpiValue} mono`}>
-              {currentData.pitch.toFixed(1)}° <span className={styles.kpiUnit}>/</span> {currentData.roll.toFixed(1)}°
+            <div className={styles.kpiLabel}><NavigationArrow size={18} weight="duotone" /> Pitch/Roll/Yaw</div>
+            <div className={`${styles.kpiValue} mono`} style={{fontSize: '1.2rem'}}>
+              {currentData.pitch.toFixed(0)}° <span className={styles.kpiUnit}>/</span> {currentData.roll.toFixed(0)}° <span className={styles.kpiUnit}>/</span> {currentData.yaw !== undefined ? currentData.yaw.toFixed(0) + '°' : 'N/A'}
             </div>
           </div>
         </motion.div>

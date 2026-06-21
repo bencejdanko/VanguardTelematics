@@ -234,17 +234,23 @@ _INT_FIELDS = {
     "gyr_x_mdps", "gyr_y_mdps", "gyr_z_mdps",
     "mag_x_mgauss", "mag_y_mgauss", "mag_z_mgauss",
 }
-_FLOAT_FIELDS = {"press_hpa", "roll_deg", "pitch_deg", "yaw_deg"}
-
+_FLOAT_FIELDS = {
+    "acc_x", "acc_y", "acc_z",
+    "gyr_x", "gyr_y", "gyr_z",
+    "mag_x", "mag_y", "mag_z",
+    "press", "roll", "pitch", "yaw",
+    "press_hpa", "roll_deg", "pitch_deg", "yaw_deg"
+}
 
 def _cast_fields(raw: dict) -> dict:
     """Cast string field values back to their proper numeric types."""
     out = {}
     for k, v in raw.items():
-        if k in _INT_FIELDS:
-            out[k] = int(v)
-        elif k in _FLOAT_FIELDS:
-            out[k] = float(v)
+        if k in _FLOAT_FIELDS or k in _INT_FIELDS:
+            try:
+                out[k] = float(v)
+            except ValueError:
+                out[k] = v
         else:
             out[k] = v
     return out
