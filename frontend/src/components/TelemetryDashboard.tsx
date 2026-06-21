@@ -1,8 +1,9 @@
 import styles from './TelemetryDashboard.module.css';
 import { SensorData } from '../types';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Thermometer, Gauge, NavigationArrow, ShieldWarning, Heartbeat } from '@phosphor-icons/react';
+import { Thermometer, Gauge, WaveSine, NavigationArrow, ShieldWarning, Heartbeat } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
+import { CybertruckViewer } from './CybertruckViewer';
 
 interface Props {
   vehicleName: string;
@@ -23,6 +24,10 @@ const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 120, damping: 20 } }
 };
+
+// Net acceleration magnitude in g (sensor reports milli-g).
+const accelG = (d: SensorData): number =>
+  Math.sqrt(d.accelX ** 2 + d.accelY ** 2 + d.accelZ ** 2) / 1000;
 
 export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, dataStream }: Props) => {
   return (
@@ -45,8 +50,15 @@ export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, data
         </div>
       </motion.header>
 
-      {currentData && (
-        <motion.div variants={itemVariants} className={styles.kpiGrid}>
+      <motion.div variants={itemVariants} className={styles.heroGrid}>
+        <CybertruckViewer
+          pitch={currentData?.pitch ?? 0}
+          roll={currentData?.roll ?? 0}
+          yaw={currentData?.yaw ?? 0}
+          isEmergency={isEmergency}
+        />
+
+        <div className={styles.statStack}>
           <div className={`${styles.kpiCard} glass-panel`}>
             <div className={styles.kpiLabel}><Gauge size={18} weight="duotone" /> Impact G-Force</div>
             <div className={`${styles.kpiValue} mono`} style={{ color: currentData.gForce && currentData.gForce > 4.0 ? 'var(--error-color, #ef4444)' : 'inherit' }}>
@@ -55,16 +67,18 @@ export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, data
           </div>
           <div className={`${styles.kpiCard} glass-panel`}>
             <div className={styles.kpiLabel}><Gauge size={18} weight="duotone" /> Pressure</div>
-            <div className={`${styles.kpiValue} mono`}>{currentData.pressure.toFixed(1)}<span className={styles.kpiUnit}>hPa</span></div>
+            <div className={`${styles.kpiValue} mono`}>{currentData ? currentData.pressure.toFixed(1) : 'N/A'}<span className={styles.kpiUnit}>hPa</span></div>
           </div>
+          
           <div className={`${styles.kpiCard} glass-panel`}>
-            <div className={styles.kpiLabel}><NavigationArrow size={18} weight="duotone" /> Pitch/Roll/Yaw</div>
-            <div className={`${styles.kpiValue} mono`} style={{ fontSize: '1.2rem' }}>
-              {currentData.pitch.toFixed(0)}° <span className={styles.kpiUnit}>/</span> {currentData.roll.toFixed(0)}° <span className={styles.kpiUnit}>/</span> {currentData.yaw !== undefined ? currentData.yaw.toFixed(0) + '°' : 'N/A'}
+            <div className={styles.kpiLabel}><WaveSine size={18} weight="duotone" /> Net Accel</div>
+            <div className={`${styles.kpiValue} mono`}>
+              {currentData ? accelG(currentData).toFixed(2) : 'N/A'}
+              <span className={styles.kpiUnit}>g</span>
             </div>
           </div>
-        </motion.div>
-      )}
+        </div>
+      </motion.div>
 
       <motion.div variants={itemVariants} className={styles.chartsGrid}>
         <div className={`${styles.chartCard} glass-panel`}>
