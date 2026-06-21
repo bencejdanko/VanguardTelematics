@@ -23,12 +23,14 @@ from datetime import datetime
 from typing import AsyncGenerator
 
 import redis.asyncio as aioredis
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-load_dotenv()
+from config import (
+    REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD,
+    REDIS_STREAM_KEY as STREAM_KEY, REDIS_LATEST_KEY as LATEST_KEY
+)
 
 logger = logging.getLogger("datalogfusion.api")
 logging.basicConfig(
@@ -36,15 +38,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
     datefmt="%H:%M:%S",
 )
-
-# ── Config ────────────────────────────────────────────────────────────────────
-
-REDIS_HOST     = os.getenv("REDIS_HOST", "coat-generous-snow-13477.db.redis.io")
-REDIS_PORT     = int(os.getenv("REDIS_PORT", "13011"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "AU0X7vgAPgJ6lLt6f4yeZQgwlVIyc0XN")
-STREAM_KEY     = os.getenv("REDIS_STREAM_KEY", "sensor:stream")
-LATEST_KEY     = os.getenv("REDIS_LATEST_KEY", "sensor:latest")
 
 from contextlib import asynccontextmanager
 

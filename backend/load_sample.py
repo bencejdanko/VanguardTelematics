@@ -17,17 +17,12 @@ import sys
 import time
 
 import redis
-from dotenv import load_dotenv
 
-load_dotenv()
-
-REDIS_HOST     = os.getenv("REDIS_HOST", "coat-generous-snow-13477.db.redis.io")
-REDIS_PORT     = int(os.getenv("REDIS_PORT", "13011"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "AU0X7vgAPgJ6lLt6f4yeZQgwlVIyc0XN")
-STREAM_KEY     = os.getenv("REDIS_STREAM_KEY", "sensor:stream")
-LATEST_KEY     = os.getenv("REDIS_LATEST_KEY", "sensor:latest")
-STREAM_MAXLEN  = int(os.getenv("REDIS_STREAM_MAXLEN", "50000"))
+from config import (
+    REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD,
+    REDIS_STREAM_KEY as STREAM_KEY, REDIS_LATEST_KEY as LATEST_KEY,
+    REDIS_STREAM_MAXLEN as STREAM_MAXLEN
+)
 
 FIELDS = [
     "timestamp",
