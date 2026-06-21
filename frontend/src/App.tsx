@@ -12,7 +12,7 @@ function App() {
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
   
   // Custom hook tracking streaming data for all vehicles in the background
-  const { dataStream, currentData, isEmergency, resetEmergency } = useSensorStream(activeVehicleId);
+  const { dataStream, currentData, emergencyType, resetEmergency } = useSensorStream(activeVehicleId);
 
   // Fetch deployed vehicles on mount
   useEffect(() => {
@@ -29,7 +29,7 @@ function App() {
 
   // Sync the vehicle list status with any live emergencies from the stream
   const displayVehicles = vehicles.map(v => {
-    if (v.id === activeVehicleId && isEmergency) {
+    if (v.id === activeVehicleId && emergencyType) {
       return { ...v, status: 'emergency' as const };
     }
     return v;
@@ -48,7 +48,7 @@ function App() {
       {activeVehicle ? (
         <TelemetryDashboard 
           vehicleName={activeVehicle.name}
-          isEmergency={isEmergency}
+          isEmergency={!!emergencyType}
           currentData={currentData}
           dataStream={dataStream}
         />
@@ -58,9 +58,10 @@ function App() {
         </div>
       )}
 
-      {isEmergency && activeVehicle && (
+      {emergencyType && activeVehicle && (
         <EmergencyAlert 
           vehicleName={activeVehicle.name} 
+          incidentType={emergencyType}
           onDismiss={resetEmergency} 
         />
       )}

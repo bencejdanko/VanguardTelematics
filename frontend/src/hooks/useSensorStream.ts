@@ -22,18 +22,20 @@ const parseSensorData = (raw: any, activeVehicleId: string): SensorData | null =
     pitch: raw.pitch || 0,
     roll: raw.roll || 0,
     yaw: raw.yaw || 0,
+    gForce: raw.g_force || 0,
   };
 };
 
-const checkEmergency = (data: SensorData): boolean => {
-  return Math.abs(data.gyroZ) > SENSOR_THRESHOLDS.GYRO_Z_MAX || 
-         Math.abs(data.accelZ) < SENSOR_THRESHOLDS.ACCEL_Z_MIN;
+const checkEmergency = (data: SensorData): string | null => {
+  if (data.gForce && data.gForce > SENSOR_THRESHOLDS.G_FORCE_CRASH) return "High-Impact Crash";
+  if (Math.abs(data.roll) > SENSOR_THRESHOLDS.ROLL_MAX || Math.abs(data.pitch) > SENSOR_THRESHOLDS.PITCH_MAX) return "Rollover";
+  return null;
 };
 
 export const useSensorStream = (activeVehicleId: string | null) => {
   const [dataStream, setDataStream] = useState<SensorData[]>([]);
   const [currentData, setCurrentData] = useState<SensorData | null>(null);
-  const [isEmergency, setIsEmergency] = useState<boolean>(false);
+  const [emergencyType, setEmergencyType] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeVehicleId) return;
@@ -51,8 +53,9 @@ export const useSensorStream = (activeVehicleId: string | null) => {
           setDataStream(currentStream);
           setCurrentData(newPoint);
           
-          if (checkEmergency(newPoint)) {
-            setIsEmergency(true);
+          const incidentType = checkEmergency(newPoint);
+          if (incidentType) {
+            setEmergencyType(incidentType);
           }
         }
       } catch (err) {
@@ -69,14 +72,14 @@ export const useSensorStream = (activeVehicleId: string | null) => {
     };
   }, [activeVehicleId]);
 
-  const resetEmergency = () => setIsEmergency(false);
+  const resetEmergency = () => setEmergencyType(null);
 
   console.log("useSensorStream state:", { activeVehicleId, dataStreamLength: dataStream.length, currentData });
 
   return { 
     dataStream, 
     currentData, 
-    isEmergency, 
+    emergencyType, 
     resetEmergency 
   };
 };

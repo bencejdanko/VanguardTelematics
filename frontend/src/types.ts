@@ -14,6 +14,7 @@ export interface SensorData {
   pitch: number;
   roll: number;
   yaw?: number;
+  gForce?: number;
 }
 
 export interface Vehicle {

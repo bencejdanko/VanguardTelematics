@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
   vehicleName: string;
+  incidentType?: string;
   onDismiss: () => void;
 }
 
@@ -19,7 +20,7 @@ const modalVariants = {
   exit: { opacity: 0, scale: 0.95, y: -20, transition: { duration: 0.2 } }
 };
 
-export const EmergencyAlert = ({ vehicleName, onDismiss }: Props) => {
+export const EmergencyAlert = ({ vehicleName, incidentType, onDismiss }: Props) => {
   return (
     <AnimatePresence>
       <motion.div 
@@ -36,9 +37,9 @@ export const EmergencyAlert = ({ vehicleName, onDismiss }: Props) => {
           </div>
           
           <div className={styles.content}>
-            <h2 className={styles.title}>Incident Detected</h2>
+            <h2 className={styles.title}>{incidentType || 'Incident'} Detected</h2>
             <p className={styles.description}>
-              Critical rollover or physical impact detected on <strong>{vehicleName}</strong>. 
+              Critical <strong>{incidentType ? incidentType.toLowerCase() : 'incident'}</strong> detected on <strong>{vehicleName}</strong>. 
               Telemetry values exceeded safe operational thresholds.
             </p>
           </div>

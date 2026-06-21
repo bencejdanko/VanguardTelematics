@@ -253,4 +253,15 @@ def _cast_fields(raw: dict) -> dict:
                 out[k] = v
         else:
             out[k] = v
+            
+    # Calculate G-Force if accelerometer data is present
+    if "acc_x" in out and "acc_y" in out and "acc_z" in out:
+        import math
+        try:
+            # Assuming ~1000 units = 1G based on typical IMU scaling
+            g_force = math.sqrt(out["acc_x"]**2 + out["acc_y"]**2 + out["acc_z"]**2) / 1000.0
+            out["g_force"] = round(g_force, 2)
+        except Exception:
+            pass
+            
     return out

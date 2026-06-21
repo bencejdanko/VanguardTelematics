@@ -22,8 +22,8 @@ STREAM_KEY = os.getenv("REDIS_STREAM_KEY", "sensor:stream")
 
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
 
-async def trigger_radio_dispatch(vehicle_id: str, reason: str):
-    logger.warning(f"EMERGENCY on {vehicle_id}: {reason}. Triggering dispatch.")
+async def trigger_radio_dispatch(vehicle_id: str, incident_type: str):
+    logger.warning(f"EMERGENCY on {vehicle_id}: {incident_type}. Triggering dispatch.")
     if not DEEPGRAM_API_KEY:
         logger.error("DEEPGRAM_API_KEY not set! Skipping TTS generation.")
         return
@@ -33,7 +33,7 @@ async def trigger_radio_dispatch(vehicle_id: str, reason: str):
             logger.error("DeepgramClient unavailable (SDK version mismatch). Skipping TTS.")
             return
         deepgram = DeepgramClient(DEEPGRAM_API_KEY)
-        text = f"Attention dispatch. Emergency detected on {vehicle_id}. Reason: {reason}. Please send immediate assistance."
+        text = f"Attention dispatch. Unit {vehicle_id} {incident_type} detected. High confidence. Crew status unknown. Immediate assistance requested."
         options = SpeakOptions(
             model="aura-asteria-en",
         )
@@ -76,18 +76,31 @@ async def analytics_worker():
                     last_id = entry_id
                     vehicle_id = fields.get("vehicle_id", "V-001") # Default for load_sample.py
                     
-                    # 1. Emergency Detection: Rollover (Gyro Z > 8000) or Impact (Accel Z drops < 500)
-                    gyr_z = float(fields.get("gyr_z_mdps", 0))
-                    acc_z = float(fields.get("acc_z_mg", 1000))
+                    # 1. Emergency Detection: High-Impact Crash (G-Force > 4.0) or Rollover (Roll/Pitch > 60)
+                    import math
                     
-                    if abs(gyr_z) > 8000 or abs(acc_z) < 500:
+                    acc_x = float(fields.get("acc_x", 0))
+                    acc_y = float(fields.get("acc_y", 0))
+                    acc_z = float(fields.get("acc_z", 0))
+                    roll = float(fields.get("roll", 0))
+                    pitch = float(fields.get("pitch", 0))
+                    
+                    g_force = math.sqrt(acc_x**2 + acc_y**2 + acc_z**2) / 1000.0
+                    
+                    incident_type = None
+                    if g_force > 4.0:
+                        incident_type = "High-Impact Crash"
+                    elif abs(roll) > 60 or abs(pitch) > 60:
+                        incident_type = "Rollover"
+
+                    if incident_type:
                         # Broadcast emergency to SSE listeners via Redis PubSub
                         await r.publish("emergency_channel", json.dumps({
                             "vehicle_id": vehicle_id, 
-                            "reason": "Rollover or Impact detected"
+                            "reason": incident_type
                         }))
                         # Trigger Deepgram Radio Broadcast
-                        await trigger_radio_dispatch(vehicle_id, "Rollover or Impact detected")
+                        await trigger_radio_dispatch(vehicle_id, incident_type)
 
                     # 2. Predictive Maintenance: Track moving average of Pressure
                     press = float(fields.get("press_hpa", 1013.25))

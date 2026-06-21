@@ -48,8 +48,10 @@ export const TelemetryDashboard = ({ vehicleName, isEmergency, currentData, data
       {currentData && (
         <motion.div variants={itemVariants} className={styles.kpiGrid}>
           <div className={`${styles.kpiCard} glass-panel`}>
-            <div className={styles.kpiLabel}><Thermometer size={18} weight="duotone" /> Core Temp</div>
-            <div className={`${styles.kpiValue} mono`}>{currentData.temperature !== undefined ? currentData.temperature.toFixed(2) : '37'}<span className={styles.kpiUnit}>°C</span></div>
+            <div className={styles.kpiLabel}><Gauge size={18} weight="duotone" /> Impact G-Force</div>
+            <div className={`${styles.kpiValue} mono`} style={{ color: currentData.gForce && currentData.gForce > 4.0 ? 'var(--error-color, #ef4444)' : 'inherit' }}>
+              {currentData.gForce !== undefined ? currentData.gForce.toFixed(2) : '0.00'}<span className={styles.kpiUnit}>G</span>
+            </div>
           </div>
           <div className={`${styles.kpiCard} glass-panel`}>
             <div className={styles.kpiLabel}><Gauge size={18} weight="duotone" /> Pressure</div>
