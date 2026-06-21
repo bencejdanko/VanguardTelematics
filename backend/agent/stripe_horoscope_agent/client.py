@@ -1,10 +1,11 @@
 import asyncio
+from datetime import datetime, timezone
 import uuid
 import sys
 from uagents import Agent, Context
 from uagents.setup import fund_agent_if_low
 
-from chat_proto import ChatMessage
+from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
 
 # Create a local client agent
 client_agent = Agent(
@@ -34,12 +35,22 @@ async def prompt_user(ctx: Context):
         
     await ctx.send(
         TARGET_AGENT_ADDRESS,
-        ChatMessage(message=msg, session_id=str(uuid.uuid4()))
+        ChatMessage(
+            timestamp=datetime.now(timezone.utc),
+            msg_id=uuid.uuid4(),
+            content=[TextContent(type="text", text=msg)]
+        )
     )
 
 @client_agent.on_message(model=ChatMessage)
 async def handle_reply(ctx: Context, sender: str, msg: ChatMessage):
-    print(f"\nHoroscope Agent: {msg.message}")
+    # Extract text from the new message format
+    reply_text = ""
+    for c in msg.content:
+        if isinstance(c, TextContent) and c.text:
+            reply_text += c.text + " "
+    
+    print(f"\nHoroscope Agent: {reply_text.strip()}")
     # Prompt for the next reply
     asyncio.create_task(prompt_user(ctx))
 
