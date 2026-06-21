@@ -28,7 +28,11 @@ const parseSensorData = (raw: any, activeVehicleId: string): SensorData | null =
 
 const checkEmergency = (data: SensorData): string | null => {
   if (data.gForce && data.gForce > SENSOR_THRESHOLDS.G_FORCE_CRASH) return "High-Impact Crash";
-  if (Math.abs(data.roll) > SENSOR_THRESHOLDS.ROLL_MAX || Math.abs(data.pitch) > SENSOR_THRESHOLDS.PITCH_MAX) return "Rollover";
+  
+  // Rollover detection using Gyroscope Vector ONLY
+  const gyroMag = Math.sqrt(data.gyroX * data.gyroX + data.gyroY * data.gyroY + data.gyroZ * data.gyroZ);
+  if (gyroMag > 30000) return "Rollover";
+  
   return null;
 };
 

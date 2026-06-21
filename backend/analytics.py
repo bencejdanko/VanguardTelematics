@@ -49,6 +49,12 @@ async def trigger_radio_dispatch(vehicle_id: str, incident_type: str):
     except Exception as e:
         logger.error(f"Deepgram TTS failed: {e}")
 
+def safe_float(val, default=0.0):
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
 async def analytics_worker():
     logger.info("Starting background analytics worker for Predictive Maintenance & Emergencies...")
     r = aioredis.Redis(
@@ -78,9 +84,9 @@ async def analytics_worker():
                     vehicle_id = fields.get("vehicle_id", "V-001") # Default for load_sample.py
                     
                     # 1. Smart Emergency Detection
-                    acc_x = float(fields.get("acc_x", fields.get("acc_x_mg", 0)))
-                    acc_y = float(fields.get("acc_y", fields.get("acc_y_mg", 0)))
-                    acc_z = float(fields.get("acc_z", fields.get("acc_z_mg", 0)))
+                    acc_x = safe_float(fields.get("acc_x", fields.get("acc_x_mg", 0)))
+                    acc_y = safe_float(fields.get("acc_y", fields.get("acc_y_mg", 0)))
+                    acc_z = safe_float(fields.get("acc_z", fields.get("acc_z_mg", 0)))
 
                     if vehicle_id not in vehicle_states:
                         vehicle_states[vehicle_id] = {
@@ -99,9 +105,9 @@ async def analytics_worker():
                     state["prev_g_force"] = g_force
                     
                     # Rollover logic using Gyroscope Vector ONLY
-                    gyr_x = float(fields.get("gyr_x", fields.get("gyr_x_mdps", 0)))
-                    gyr_y = float(fields.get("gyr_y", fields.get("gyr_y_mdps", 0)))
-                    gyr_z = float(fields.get("gyr_z", fields.get("gyr_z_mdps", 0)))
+                    gyr_x = safe_float(fields.get("gyr_x", fields.get("gyr_x_mdps", 0)))
+                    gyr_y = safe_float(fields.get("gyr_y", fields.get("gyr_y_mdps", 0)))
+                    gyr_z = safe_float(fields.get("gyr_z", fields.get("gyr_z_mdps", 0)))
                     gyr_mag = math.sqrt(gyr_x**2 + gyr_y**2 + gyr_z**2)
                     
                     # If rotation rate is high (e.g., > 30000 mdps = 30 dps) for a sustained period
@@ -133,7 +139,7 @@ async def analytics_worker():
                         await trigger_radio_dispatch(vehicle_id, incident_type)
 
                     # 2. Predictive Maintenance: Track moving average of Pressure
-                    press = float(fields.get("press_hpa", 1013.25))
+                    press = safe_float(fields.get("press_hpa", 1013.25), 1013.25)
                     
                     if vehicle_id not in maintenance_windows:
                         maintenance_windows[vehicle_id] = []
