@@ -11,18 +11,25 @@ interface Incident {
 
 export function IncidentPanel() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [hasShown, setHasShown] = useState(false);
 
   useEffect(() => {
     const poll = async () => {
       try {
         const res = await fetch(`${API}/incidents?limit=5`);
-        if (res.ok) setIncidents(await res.json());
+        if (res.ok) {
+          const data = await res.json();
+          setIncidents(data);
+          if (data.length > 0) setHasShown(true);
+        }
       } catch {}
     };
     poll();
     const id = setInterval(poll, 3000);
     return () => clearInterval(id);
   }, []);
+
+  if (!hasShown) return null;
 
   return (
     <div style={{
