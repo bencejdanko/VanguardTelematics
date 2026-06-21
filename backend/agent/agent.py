@@ -33,7 +33,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from config import (
     REDIS_HOST, REDIS_PORT, REDIS_USERNAME, REDIS_PASSWORD,
-    REDIS_LATEST_KEY as LATEST_KEY
+    REDIS_LATEST_KEY as LATEST_KEY, ASI_API_KEY, AGENT_SEED_PHRASE
 )
 
 
@@ -42,12 +42,12 @@ client = OpenAI(
     base_url='https://api.asi1.ai/v1',
  
     # You can get an ASI:One api key by creating an account at https://asi1.ai/dashboard/api-keys
-    api_key='sk_080743e20e5b451ba911b80366080bdf645fdb0730a24959ba02b4de971d78eb',
+    api_key=ASI_API_KEY,
 )
  
 agent = Agent(
     name="Predictive-Disaster-Monitor-Agent",
-    seed="UCB-AI-Hackathon-2026-Winner-Predictive-Disaster-Monitor-Agent",
+    seed=AGENT_SEED_PHRASE,
     port=8001,
     mailbox=True,
     publish_agent_details=True,
